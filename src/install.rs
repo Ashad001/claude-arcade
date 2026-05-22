@@ -1,5 +1,5 @@
-use color_eyre::eyre::{bail, eyre, Context, Result};
-use serde_json::{json, Value};
+use color_eyre::eyre::{Context, Result, bail, eyre};
+use serde_json::{Value, json};
 use std::fs;
 use std::io::{self, Write as IoWrite};
 use std::path::{Path, PathBuf};
@@ -50,8 +50,7 @@ pub fn install(yes: bool, dry_run: bool) -> Result<()> {
     }
 
     // Create directories
-    fs::create_dir_all(&hooks_dir)
-        .with_context(|| format!("creating {}", hooks_dir.display()))?;
+    fs::create_dir_all(&hooks_dir).with_context(|| format!("creating {}", hooks_dir.display()))?;
 
     if let Some(state_dir) = dirs::home_dir().map(|h| h.join(".claude-arcade")) {
         fs::create_dir_all(&state_dir)
@@ -61,8 +60,7 @@ pub fn install(yes: bool, dry_run: bool) -> Result<()> {
     // Write hook scripts
     for (name, content) in &hook_scripts {
         let dest = hooks_dir.join(name);
-        write_executable(&dest, content)
-            .with_context(|| format!("writing {}", dest.display()))?;
+        write_executable(&dest, content).with_context(|| format!("writing {}", dest.display()))?;
         println!("  wrote  {}", dest.display());
     }
 
@@ -162,10 +160,9 @@ fn read_settings(path: &Path) -> Result<Value> {
     if !path.exists() {
         return Ok(json!({}));
     }
-    let contents = fs::read_to_string(path)
-        .with_context(|| format!("reading {}", path.display()))?;
-    serde_json::from_str(&contents)
-        .with_context(|| format!("parsing {}", path.display()))
+    let contents =
+        fs::read_to_string(path).with_context(|| format!("reading {}", path.display()))?;
+    serde_json::from_str(&contents).with_context(|| format!("parsing {}", path.display()))
 }
 
 fn merge_hooks(mut settings: Value, hooks_dir: &Path) -> Result<Value> {
@@ -212,10 +209,7 @@ fn merge_hooks(mut settings: Value, hooks_dir: &Path) -> Result<Value> {
 }
 
 fn remove_hooks(mut settings: Value, hooks_dir: &Path) -> Value {
-    if let Some(hooks_obj) = settings
-        .get_mut("hooks")
-        .and_then(|h| h.as_object_mut())
-    {
+    if let Some(hooks_obj) = settings.get_mut("hooks").and_then(|h| h.as_object_mut()) {
         let prefix = hooks_dir.to_string_lossy().to_string();
         for arr in hooks_obj.values_mut() {
             if let Some(entries) = arr.as_array_mut() {
@@ -281,10 +275,22 @@ fn hook_event_map(hooks_dir: &Path) -> Vec<(String, String)> {
 
 fn hook_script_contents() -> Vec<(String, String)> {
     vec![
-        ("session_start.sh".into(), include_str!("../hooks/session_start.sh").into()),
-        ("pre_tool_use.sh".into(), include_str!("../hooks/pre_tool_use.sh").into()),
-        ("notification.sh".into(), include_str!("../hooks/notification.sh").into()),
+        (
+            "session_start.sh".into(),
+            include_str!("../hooks/session_start.sh").into(),
+        ),
+        (
+            "pre_tool_use.sh".into(),
+            include_str!("../hooks/pre_tool_use.sh").into(),
+        ),
+        (
+            "notification.sh".into(),
+            include_str!("../hooks/notification.sh").into(),
+        ),
         ("stop.sh".into(), include_str!("../hooks/stop.sh").into()),
-        ("session_end.sh".into(), include_str!("../hooks/session_end.sh").into()),
+        (
+            "session_end.sh".into(),
+            include_str!("../hooks/session_end.sh").into(),
+        ),
     ]
 }
