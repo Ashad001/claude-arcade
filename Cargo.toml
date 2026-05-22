@@ -1,0 +1,43 @@
+[package]
+name = "claude-arcade"
+version = "0.1.0"
+edition = "2024"
+description = "Terminal Minesweeper that keeps you in the terminal while Claude works"
+license = "MIT"
+repository = "https://github.com/Ashad001/claude-arcade"
+
+[dependencies]
+ratatui = "0.30"
+crossterm = { version = "0.29", features = ["event-stream"] }
+color-eyre = "0.6"
+clap = { version = "4", features = ["derive"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+dirs = "6"
+rand = "0.9"
+
+[profile.release]
+lto = true
+codegen-units = 1
+panic = "abort"
+strip = true
+
+# cargo-dist release configuration
+[workspace.metadata.dist]
+# The preferred cargo-dist version to use in CI (Cargo.lock is not respected)
+cargo-dist-version = "0.28.0"
+# CI backends to support
+ci = "github"
+# The installers to generate for each app
+installers = ["shell"]
+# Target platforms to build for
+targets = [
+    "aarch64-apple-darwin",
+    "x86_64-apple-darwin",
+    "x86_64-unknown-linux-gnu",
+    "aarch64-unknown-linux-gnu",
+]
+# Publish jobs to run in CI
+publish-jobs = ["./publish-homebrew"]
+# Which actions to run on pull requests
+pr-run-mode = "plan"

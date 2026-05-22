@@ -7,6 +7,7 @@ use std::path::{Path, PathBuf};
 const HOOKS_SUBDIR: &str = "claude-arcade";
 
 pub fn install(yes: bool, dry_run: bool) -> Result<()> {
+    check_platform()?;
     check_tmux()?;
 
     let hooks_dir = claude_hooks_dir()?;
@@ -76,6 +77,7 @@ pub fn install(yes: bool, dry_run: bool) -> Result<()> {
 }
 
 pub fn uninstall(yes: bool) -> Result<()> {
+    check_platform()?;
     let hooks_dir = claude_hooks_dir()?;
     let settings_path = claude_settings_path()?;
 
@@ -105,6 +107,20 @@ pub fn uninstall(yes: bool) -> Result<()> {
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
+
+fn check_platform() -> Result<()> {
+    if cfg!(target_os = "windows") {
+        bail!(
+            "✗ claude-arcade hooks require tmux and POSIX shell, which are not available on Windows.\n\
+             \n\
+             The game itself (claude-arcade play) works on Windows.\n\
+             Hook integration is coming in v2.\n\
+             \n\
+             Track progress: https://github.com/Ashad001/claude-arcade/issues"
+        );
+    }
+    Ok(())
+}
 
 fn check_tmux() -> Result<()> {
     if which_tmux() {

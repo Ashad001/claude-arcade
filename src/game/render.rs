@@ -1,6 +1,6 @@
 use ratatui::{
     Frame,
-    layout::{Constraint, Layout, Rect},
+    layout::{Alignment, Constraint, Layout, Rect},
     style::{Color, Style},
     text::{Line, Span},
     widgets::{Block, BorderType, Borders, Paragraph},
@@ -10,7 +10,22 @@ use crate::game::board::{CellView, GameState};
 use crate::game::App;
 use crate::state::ClaudeStatus;
 
-pub fn ui(frame: &mut Frame, app: &App) {
+// ─── Colour palette ──────────────────────────────────────────────────────────
+
+/// Hidden tile: light enough to pop against any dark terminal background
+const HIDDEN_BG: Color = Color::Rgb(90, 100, 120);
+const HIDDEN_FG: Color = Color::Rgb(130, 145, 170);
+
+/// Revealed (pressed-in) tile — clearly darker than hidden
+const REVEALED_BG: Color = Color::Rgb(28, 30, 38);
+
+/// Cursor highlight
+const CURSOR_BG: Color = Color::Rgb(230, 190, 0);
+const CURSOR_FG: Color = Color::Black;
+
+// ─── Entry point ─────────────────────────────────────────────────────────────
+
+pub fn ui(frame: &mut Frame, app: &mut App) {
     let [header_area, board_area, footer_area] = Layout::vertical([
         Constraint::Length(1),
         Constraint::Fill(1),
@@ -23,190 +38,314 @@ pub fn ui(frame: &mut Frame, app: &App) {
     render_footer(frame, app, footer_area);
 }
 
-fn render_header(frame: &mut Frame, app: &App, area: Rect) {
+// ─── Header ──────────────────────────────────────────────────────────────────
+
+fn render_header(frame: &mut Frame, app: &mut App, area: Rect) {
     let mines_left = app.board.mines_remaining();
-    let state_indicator = match app.board.state {
-        GameState::Playing => "●",
-        GameState::Won => "✓",
-        GameState::Lost => "✗",
+    let (status_char, status_style) = match app.board.state {
+        GameState::Playing => ("▶", Style::new().fg(Color::Cyan)),
+        GameState::Won => ("★", Style::new().fg(Color::Green).bold()),
+        GameState::Lost => ("✗", Style::new().fg(Color::Red).bold()),
     };
+    let mine_style = if mines_left <= 3 {
+        Style::new().fg(Color::Red).bold()
+    } else {
+        Style::new().fg(Color::Yellow)
+    };
+    let (cx, cy) = app.cursor;
     let header = Line::from(vec![
         Span::styled(" MINESWEEPER ", Style::new().bold()),
-        Span::raw(state_indicator),
-        Span::raw(format!("  Mines: {}  ", mines_left)),
-        Span::styled(format!("Score: {}", app.score), Style::new().cyan()),
+        Span::styled(status_char, status_style),
+        Span::raw("  "),
+        Span::styled("⚑ ", Style::new().fg(Color::Red)),
+        Span::styled(format!("{:<3}", mines_left), mine_style),
+        Span::raw("  "),
+        Span::styled(format!("Score: {}", app.score), Style::new().fg(Color::Cyan)),
+        Span::styled(
+            format!("  [{},{}]", cx + 1, cy + 1),
+            Style::new().fg(Color::DarkGray),
+        ),
     ]);
     frame.render_widget(Paragraph::new(header), area);
 }
 
-fn render_board(frame: &mut Frame, app: &App, area: Rect) {
-    let (border_style, border_type) = border_for_status(app);
+// ─── Board ───────────────────────────────────────────────────────────────────
 
+fn render_board(frame: &mut Frame, app: &mut App, area: Rect) {
+    let (border_style, border_type, title) = border_config(app);
     let block = Block::default()
         .borders(Borders::ALL)
         .border_style(border_style)
-        .border_type(border_type);
+        .border_type(border_type)
+        .title(title)
+        .title_alignment(Alignment::Center);
 
     let inner = block.inner(area);
     frame.render_widget(block, area);
 
-    // Each cell is 2 chars wide for readability
-    let cell_width = 2usize;
-    let board_width = app.board.width * cell_width;
-    let board_height = app.board.height;
+    // Each cell = 2 chars wide. How many columns fit?
+    let visible_cols = ((inner.width as usize) / 2).min(app.board.width);
+    let visible_rows = (inner.height as usize).min(app.board.height);
 
-    // Horizontally and vertically centre the board within inner
-    let x_offset = (inner.width as usize).saturating_sub(board_width) / 2;
-    let y_offset = (inner.height as usize).saturating_sub(board_height) / 2;
+    // Update viewport so cursor stays on screen (no inserts into spans — kept clean)
+    app.scroll_to_cursor(visible_cols, visible_rows);
+    let (vx, vy) = app.viewport;
 
-    for row in 0..app.board.height {
-        let y = inner.top() + (y_offset + row) as u16;
+    // Vertical centering when board fits fully
+    let y_pad = if app.board.height < visible_rows {
+        (inner.height as usize).saturating_sub(app.board.height) / 2
+    } else {
+        0
+    };
+
+    for row in 0..visible_rows {
+        let board_row = vy + row;
+        if board_row >= app.board.height {
+            break;
+        }
+        let y = inner.top() + (y_pad + row) as u16;
         if y >= inner.bottom() {
             break;
         }
 
-        let mut spans: Vec<Span> = Vec::with_capacity(app.board.width);
-        // Add left padding
-        if x_offset > 0 {
-            spans.push(Span::raw(" ".repeat(x_offset)));
+        let mut spans: Vec<Span> = Vec::with_capacity(visible_cols);
+        for col in 0..visible_cols {
+            let board_col = vx + col;
+            if board_col >= app.board.width {
+                break;
+            }
+            spans.push(cell_span(
+                app.board.cell_view(board_col, board_row),
+                app.cursor == (board_col, board_row),
+            ));
         }
 
-        for col in 0..app.board.width {
-            let is_cursor = app.cursor == (col, row);
-            let view = app.board.cell_view(col, row);
-            spans.push(cell_span(view, is_cursor));
-        }
-
-        let line = Line::from(spans);
-        let row_rect = Rect::new(inner.left(), y, inner.width, 1);
-        frame.render_widget(Paragraph::new(line), row_rect);
+        frame.render_widget(
+            Paragraph::new(Line::from(spans)),
+            Rect::new(inner.left(), y, inner.width, 1),
+        );
     }
 
-    // Overlay banners for win/loss
+    // Scroll arrows rendered separately — never mixed into cell spans
+    render_scroll_arrows(frame, inner, app, visible_cols, visible_rows);
+
     if app.board.state == GameState::Won {
-        render_banner(frame, inner, "  YOU WIN! Press 'r' to restart  ", Color::Green);
+        render_banner(frame, inner, " YOU WIN!  Press r to restart ", Color::Green);
     } else if app.board.state == GameState::Lost {
-        render_banner(frame, inner, "  BOOM! Press 'r' to restart  ", Color::Red);
+        render_banner(frame, inner, " BOOM!  Press r to restart ", Color::Red);
     }
 }
 
-fn render_footer(frame: &mut Frame, app: &App, area: Rect) {
+/// Draw directional arrows at the border — never inserted into cell rows.
+fn render_scroll_arrows(
+    frame: &mut Frame,
+    inner: Rect,
+    app: &App,
+    visible_cols: usize,
+    visible_rows: usize,
+) {
+    let (vx, vy) = app.viewport;
+    let arrow = Style::new().fg(Color::DarkGray);
+    let mid_x = inner.left() + inner.width / 2;
+    let mid_y = inner.top() + inner.height / 2;
+
+    if vy > 0 {
+        frame.render_widget(
+            Paragraph::new("▲").style(arrow),
+            Rect::new(mid_x, inner.top(), 1, 1),
+        );
+    }
+    if vy + visible_rows < app.board.height {
+        frame.render_widget(
+            Paragraph::new("▼").style(arrow),
+            Rect::new(mid_x, inner.bottom().saturating_sub(1), 1, 1),
+        );
+    }
+    if vx > 0 {
+        frame.render_widget(
+            Paragraph::new("◀").style(arrow),
+            Rect::new(inner.left(), mid_y, 1, 1),
+        );
+    }
+    if vx + visible_cols < app.board.width {
+        frame.render_widget(
+            Paragraph::new("▶").style(arrow),
+            Rect::new(inner.right().saturating_sub(1), mid_y, 1, 1),
+        );
+    }
+}
+
+// ─── Footer ──────────────────────────────────────────────────────────────────
+
+fn render_footer(frame: &mut Frame, app: &mut App, area: Rect) {
     let line = match &app.claude_state.status {
         ClaudeStatus::Working => {
-            let tool = app
-                .claude_state
-                .tool
-                .as_deref()
-                .unwrap_or("unknown");
+            let tool = app.claude_state.tool.as_deref().unwrap_or("unknown");
             Line::from(vec![
-                Span::styled(" ⏺ ", Style::new().cyan()),
-                Span::styled(
-                    format!("Claude is working: {tool}"),
-                    Style::new().dim(),
-                ),
-                key_hints_right(),
+                Span::styled(" ⏺ ", Style::new().fg(Color::Cyan)),
+                Span::styled(format!("Claude is working: {tool}"), Style::new().dim()),
+                key_hints(),
             ])
         }
-        ClaudeStatus::PermissionNeeded => Line::from(vec![
-            if app.flash_on {
-                Span::styled(" ⚠  CLAUDE NEEDS PERMISSION — SWITCH PANES ", Style::new().red().bold())
+        ClaudeStatus::PermissionNeeded => {
+            let style = if app.flash_on {
+                Style::new().fg(Color::White).bg(Color::Red).bold()
             } else {
-                Span::styled(" ⚠  CLAUDE NEEDS PERMISSION — SWITCH PANES ", Style::new().dim())
-            },
-        ]),
+                Style::new().fg(Color::Red).bold()
+            };
+            Line::from(Span::styled(
+                " ⚠  CLAUDE NEEDS PERMISSION — SWITCH PANES  ",
+                style,
+            ))
+        }
         ClaudeStatus::Idle => Line::from(vec![
-            Span::styled(" ⏸  Claude is waiting for your input", Style::new().yellow()),
-            key_hints_right(),
+            Span::styled(" ⏸ ", Style::new().fg(Color::Yellow)),
+            Span::styled(
+                "Claude is waiting for your input",
+                Style::new().fg(Color::Yellow).dim(),
+            ),
+            key_hints(),
         ]),
         ClaudeStatus::Done => Line::from(vec![
-            Span::styled(" ✓ Claude finished", Style::new().green().bold()),
-            key_hints_right(),
+            Span::styled(" ✓ Claude finished", Style::new().fg(Color::Green).bold()),
+            key_hints(),
         ]),
         ClaudeStatus::Unknown => Line::from(vec![
-            Span::raw(" ↑↓←→/hjkl "),
-            Span::styled("move  ", Style::new().dim()),
-            Span::raw("Space "),
-            Span::styled("reveal  ", Style::new().dim()),
-            Span::raw("f "),
-            Span::styled("flag  ", Style::new().dim()),
-            Span::raw("r "),
-            Span::styled("restart  ", Style::new().dim()),
-            Span::raw("q "),
-            Span::styled("quit", Style::new().dim()),
+            Span::styled(" hjkl", Style::new().fg(Color::Cyan)),
+            Span::styled("/arrows ", Style::new().dim()),
+            Span::styled("Space", Style::new().fg(Color::Cyan)),
+            Span::styled(" reveal  ", Style::new().dim()),
+            Span::styled("f", Style::new().fg(Color::Cyan)),
+            Span::styled(" flag  ", Style::new().dim()),
+            Span::styled("r", Style::new().fg(Color::Cyan)),
+            Span::styled(" restart  ", Style::new().dim()),
+            Span::styled("q", Style::new().fg(Color::Cyan)),
+            Span::styled(" quit", Style::new().dim()),
         ]),
     };
     frame.render_widget(Paragraph::new(line), area);
 }
 
-// ─── Helpers ──────────────────────────────────────────────────────────────────
-
-fn border_for_status(app: &App) -> (Style, BorderType) {
-    match &app.claude_state.status {
-        ClaudeStatus::Working => (Style::new().blue(), BorderType::Rounded),
-        ClaudeStatus::PermissionNeeded => {
-            if app.flash_on {
-                (Style::new().red().bold(), BorderType::Double)
-            } else {
-                (Style::new().dark_gray(), BorderType::Rounded)
-            }
-        }
-        ClaudeStatus::Idle => (Style::new().yellow(), BorderType::Rounded),
-        ClaudeStatus::Done => {
-            if app.done_since.is_some() {
-                (Style::new().green(), BorderType::Double)
-            } else {
-                (Style::new(), BorderType::Rounded)
-            }
-        }
-        ClaudeStatus::Unknown => (Style::new(), BorderType::Rounded),
-    }
-}
+// ─── Cell rendering ───────────────────────────────────────────────────────────
 
 fn cell_span(view: CellView, is_cursor: bool) -> Span<'static> {
-    let (text, style) = match view {
-        CellView::Hidden => ("██", Style::new().dark_gray()),
-        CellView::Flag => ("⚑ ", Style::new().red().bold()),
-        CellView::Mine => ("✸ ", Style::new().red().bold()),
-        CellView::Number(0) => ("  ", Style::new()),
-        CellView::Number(n) => {
-            let style = match n {
-                1 => Style::new().blue(),
-                2 => Style::new().green(),
-                3 => Style::new().red(),
-                4 => Style::new().cyan(),
-                5 => Style::new().magenta(),
-                6 => Style::new().cyan().bold(),
-                7 => Style::new().red().bold(),
-                _ => Style::new().white().bold(),
-            };
-            return Span::styled(format!("{n} "), style.bg(if is_cursor { Color::DarkGray } else { Color::Reset }));
+    match view {
+        CellView::Hidden => {
+            if is_cursor {
+                // Solid yellow block — unmistakable cursor on unrevealed tile
+                Span::styled("██", Style::new().fg(CURSOR_BG).bg(CURSOR_BG))
+            } else {
+                // Light raised tile — clearly distinct from revealed (dark) cells
+                Span::styled("▒▒", Style::new().fg(HIDDEN_FG).bg(HIDDEN_BG))
+            }
         }
-    };
-    if is_cursor {
-        Span::styled(text, style.bg(Color::DarkGray))
-    } else {
-        Span::styled(text, style)
+
+        CellView::Flag => {
+            // Flag character on saturated red — Color::Red is ANSI muted red,
+            // Rgb gives the vivid red that actually reads as "flag"
+            let bg = if is_cursor {
+                CURSOR_BG
+            } else {
+                Color::Rgb(210, 35, 35)
+            };
+            Span::styled("⚑ ", Style::new().fg(Color::White).bg(bg).bold())
+        }
+
+        CellView::Mine => {
+            // Exploded mine
+            Span::styled("* ", Style::new().fg(Color::White).bg(Color::Red).bold())
+        }
+
+        CellView::Number(0) => {
+            // Revealed empty — dark "pressed in" look, clearly different from hidden tiles
+            let bg = if is_cursor { CURSOR_BG } else { REVEALED_BG };
+            let fg = if is_cursor { CURSOR_FG } else { Color::DarkGray };
+            Span::styled("· ", Style::new().fg(fg).bg(bg))
+        }
+
+        CellView::Number(n) => {
+            let fg = if is_cursor { CURSOR_FG } else { number_color(n) };
+            let bg = if is_cursor { CURSOR_BG } else { REVEALED_BG };
+            Span::styled(format!("{n} "), Style::new().fg(fg).bg(bg).bold())
+        }
     }
 }
 
-fn key_hints_right() -> Span<'static> {
-    Span::styled("  hjkl/arrows:move  Space:reveal  f:flag  r:restart  q:quit", Style::new().dim())
+fn number_color(n: u8) -> Color {
+    match n {
+        1 => Color::Cyan,
+        2 => Color::Green,
+        3 => Color::LightRed,
+        4 => Color::Blue,
+        5 => Color::Red,
+        6 => Color::LightCyan,
+        7 => Color::Magenta,
+        _ => Color::White,
+    }
+}
+
+// ─── Border config ────────────────────────────────────────────────────────────
+
+fn border_config(app: &App) -> (Style, BorderType, String) {
+    let diff = format!(
+        " {} ",
+        format!("{:?}", app.difficulty).to_lowercase()
+    );
+    match &app.claude_state.status {
+        ClaudeStatus::Working => (Style::new().fg(Color::Blue), BorderType::Rounded, diff),
+        ClaudeStatus::PermissionNeeded => {
+            if app.flash_on {
+                (
+                    Style::new().fg(Color::Red).bold(),
+                    BorderType::Double,
+                    " ⚠ PERMISSION NEEDED ".into(),
+                )
+            } else {
+                (Style::new().fg(Color::DarkGray), BorderType::Rounded, diff)
+            }
+        }
+        ClaudeStatus::Idle => (Style::new().fg(Color::Yellow), BorderType::Rounded, diff),
+        ClaudeStatus::Done => {
+            if app.done_since.is_some() {
+                (
+                    Style::new().fg(Color::Green),
+                    BorderType::Double,
+                    " ✓ done ".into(),
+                )
+            } else {
+                (Style::new(), BorderType::Rounded, diff)
+            }
+        }
+        ClaudeStatus::Unknown => (Style::new(), BorderType::Rounded, diff),
+    }
+}
+
+// ─── Helpers ─────────────────────────────────────────────────────────────────
+
+fn key_hints() -> Span<'static> {
+    Span::styled(
+        "  hjkl move  Space reveal  f flag  r restart  q quit",
+        Style::new().dim(),
+    )
 }
 
 fn render_banner(frame: &mut Frame, area: Rect, text: &str, color: Color) {
-    let width = text.len() as u16 + 2;
-    let height = 3u16;
+    let width = (text.len() as u16 + 2).min(area.width);
+    let height = 3u16.min(area.height);
     let x = area.left() + area.width.saturating_sub(width) / 2;
     let y = area.top() + area.height.saturating_sub(height) / 2;
-    let banner_area = Rect::new(x, y, width.min(area.width), height.min(area.height));
+    let banner_area = Rect::new(x, y, width, height);
 
     let block = Block::default()
         .borders(Borders::ALL)
-        .border_style(Style::new().fg(color).bold());
+        .border_style(Style::new().fg(color).bold())
+        .style(Style::new().bg(Color::Black));
     let inner = block.inner(banner_area);
     frame.render_widget(block, banner_area);
     frame.render_widget(
-        Paragraph::new(text).centered().style(Style::new().fg(color).bold()),
+        Paragraph::new(text)
+            .centered()
+            .style(Style::new().fg(color).bold()),
         inner,
     );
 }

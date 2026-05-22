@@ -47,8 +47,8 @@ fn run_loop(terminal: &mut ratatui::DefaultTerminal, difficulty: Difficulty) -> 
         // 3. Tick timers
         app.tick(Instant::now());
 
-        // 4. Render
-        terminal.draw(|f| render::ui(f, &app))?;
+        // 4. Render  (pass &mut app so render can update viewport)
+        terminal.draw(|f| render::ui(f, &mut app))?;
 
         if app.should_quit {
             break;
