@@ -4,6 +4,7 @@ use color_eyre::eyre::Result;
 mod game;
 mod install;
 mod state;
+mod stats;
 mod tui;
 
 #[derive(Debug, Parser)]
@@ -36,6 +37,8 @@ enum Commands {
         #[arg(long)]
         yes: bool,
     },
+    /// Print the local leaderboard and exit
+    Stats,
 }
 
 #[derive(Debug, Clone, clap::ValueEnum)]
@@ -72,5 +75,26 @@ fn main() -> Result<()> {
         Commands::Play { difficulty } => tui::run(difficulty),
         Commands::Install { yes, dry_run } => install::install(yes, dry_run),
         Commands::Uninstall { yes } => install::uninstall(yes),
+        Commands::Stats => print_stats(),
     }
+}
+
+fn print_stats() -> Result<()> {
+    let records = stats::leaderboard_top(10);
+    if records.is_empty() {
+        println!("No games recorded yet. Play some games first!");
+        return Ok(());
+    }
+    println!("{:<8} {:>7}  {:>5}  {:<3}  {}", "DIFF", "SCORE", "TIME", "WIN", "DATE");
+    println!("{}", "─".repeat(42));
+    for r in &records {
+        let time_str = format!("{:02}:{:02}", r.time_secs / 60, r.time_secs % 60);
+        let won_str = if r.won { "yes" } else { "no " };
+        let date = if r.timestamp.len() >= 10 { &r.timestamp[..10] } else { &r.timestamp };
+        println!(
+            "{:<8} {:>7}  {:>5}  {:<3}  {}",
+            r.difficulty, r.score, time_str, won_str, date
+        );
+    }
+    Ok(())
 }

@@ -9,26 +9,27 @@ pub enum Action {
     Reveal,
     Flag,
     Restart,
+    ToggleLeaderboard,
     Quit,
 }
 
 /// Map a key event to an Action.
-/// Only processes Press events — ignores Repeat and Release.
-/// This prevents toggle actions (flag, restart) from firing twice when a key
-/// is held down on Windows, which sends both Press and Repeat events.
+/// Toggle actions (f, r, q, Esc, Tab) only fire on Press — never on Repeat.
+/// Movement and reveal are allowed to repeat (comfortable to hold).
+/// Release events are always ignored.
 pub fn map_key(key: KeyEvent) -> Option<Action> {
-    // Allow movement and reveal to repeat (comfortable to hold)
-    // Block repeat for toggles: flag, restart, quit
     let is_toggle = matches!(
         key.code,
-        KeyCode::Char('f') | KeyCode::Char('r') | KeyCode::Char('q') | KeyCode::Esc
+        KeyCode::Char('f')
+            | KeyCode::Char('r')
+            | KeyCode::Char('q')
+            | KeyCode::Esc
+            | KeyCode::Tab
     );
 
     if is_toggle && key.kind != KeyEventKind::Press {
         return None;
     }
-
-    // Ignore release events for everything
     if key.kind == KeyEventKind::Release {
         return None;
     }
@@ -41,6 +42,7 @@ pub fn map_key(key: KeyEvent) -> Option<Action> {
         KeyCode::Char(' ') | KeyCode::Enter => Some(Action::Reveal),
         KeyCode::Char('f') => Some(Action::Flag),
         KeyCode::Char('r') => Some(Action::Restart),
+        KeyCode::Tab => Some(Action::ToggleLeaderboard),
         KeyCode::Char('q') | KeyCode::Esc => Some(Action::Quit),
         _ => None,
     }

@@ -21,6 +21,17 @@ pub struct App {
     pub done_since: Option<Instant>,
     pub flash_on: bool,
     flash_tick: u8,
+
+    // Timer tracking
+    pub timer_start: Option<Instant>,   // set on first actual reveal
+    paused_at: Option<Instant>,         // Some while PermissionNeeded is active
+    paused_secs: u64,                   // accumulated pause time
+    pub elapsed_secs: u64,              // frozen final value when game ends
+
+    // Leaderboard overlay
+    pub show_leaderboard: bool,
+    pub leaderboard_cache: Vec<crate::stats::GameRecord>,
+    pub record_saved: bool,             // guard: save only once per game
 }
 
 impl App {
@@ -38,6 +49,15 @@ impl App {
             done_since: None,
             flash_on: true,
             flash_tick: 0,
+
+            timer_start: None,
+            paused_at: None,
+            paused_secs: 0,
+            elapsed_secs: 0,
+
+            show_leaderboard: false,
+            leaderboard_cache: vec![],
+            record_saved: false,
         }
     }
 
@@ -58,12 +78,24 @@ impl App {
             input::Action::MoveRight => self.cursor.0 = (self.cursor.0 + 1).min(w - 1),
             input::Action::Reveal => {
                 let newly_revealed = self.board.reveal(self.cursor.0, self.cursor.1);
-                if self.claude_state.status != ClaudeStatus::PermissionNeeded {
-                    self.score += newly_revealed * self.difficulty.score_multiplier();
+                if newly_revealed > 0 {
+                    // Start timer on the first successful reveal
+                    if self.timer_start.is_none() {
+                        self.timer_start = Some(Instant::now());
+                    }
+                    if self.claude_state.status != ClaudeStatus::PermissionNeeded {
+                        self.score += newly_revealed * self.difficulty.score_multiplier();
+                    }
                 }
             }
             input::Action::Flag => self.board.toggle_flag(self.cursor.0, self.cursor.1),
             input::Action::Restart => self.restart(),
+            input::Action::ToggleLeaderboard => {
+                self.show_leaderboard = !self.show_leaderboard;
+                if self.show_leaderboard {
+                    self.leaderboard_cache = crate::stats::leaderboard_top(10);
+                }
+            }
             input::Action::Quit => self.should_quit = true,
         }
     }
@@ -106,9 +138,22 @@ impl App {
         let prev_status = self.claude_state.status.clone();
         self.claude_state = new_state;
 
+        if prev_status != ClaudeStatus::PermissionNeeded
+            && self.claude_state.status == ClaudeStatus::PermissionNeeded
+        {
+            // Transitioning INTO PermissionNeeded — start pausing
+            if self.timer_start.is_some() {
+                self.paused_at = Some(Instant::now());
+            }
+        }
+
         if prev_status == ClaudeStatus::PermissionNeeded
             && self.claude_state.status != ClaudeStatus::PermissionNeeded
         {
+            // Transitioning OUT of PermissionNeeded — accumulate pause duration
+            if let Some(pa) = self.paused_at.take() {
+                self.paused_secs += pa.elapsed().as_secs();
+            }
             self.permission_alerted = false;
         }
 
@@ -140,6 +185,49 @@ impl App {
         {
             self.score += self.board.flag_bonus() * self.difficulty.score_multiplier();
         }
+
+        // Save record once when the game ends
+        if self.board.state != GameState::Playing && !self.record_saved && self.timer_start.is_some() {
+            self.elapsed_secs = self.current_elapsed_secs(now);
+            let (_, _, mine_count) = self.difficulty.board_params();
+            let record = crate::stats::GameRecord {
+                difficulty: format!("{:?}", self.difficulty).to_lowercase(),
+                score: self.score,
+                time_secs: self.elapsed_secs,
+                won: self.board.state == GameState::Won,
+                timestamp: crate::stats::current_timestamp(),
+                board_width: self.board.width,
+                board_height: self.board.height,
+                mine_count,
+            };
+            let _ = crate::stats::append_record(record);
+            self.record_saved = true;
+            if self.show_leaderboard {
+                self.leaderboard_cache = crate::stats::leaderboard_top(10);
+            }
+        }
+    }
+
+    /// Elapsed game time in seconds, accounting for pauses.
+    /// Returns 0 if the timer has not started.
+    /// Returns the frozen value if the game is over.
+    fn current_elapsed_secs(&self, now: Instant) -> u64 {
+        let Some(start) = self.timer_start else {
+            return 0;
+        };
+        if self.board.state != GameState::Playing {
+            return self.elapsed_secs;
+        }
+        let raw = now.duration_since(start).as_secs();
+        let currently_pausing = self.paused_at
+            .map(|pa| now.duration_since(pa).as_secs())
+            .unwrap_or(0);
+        raw.saturating_sub(self.paused_secs + currently_pausing)
+    }
+
+    pub fn elapsed_display(&self, now: Instant) -> String {
+        let s = self.current_elapsed_secs(now);
+        format!("{:02}:{:02}", s / 60, s % 60)
     }
 
     fn restart(&mut self) {
@@ -149,5 +237,12 @@ impl App {
         self.viewport = (0, 0);
         self.score = 0;
         self.permission_alerted = false;
+
+        // Reset timer
+        self.timer_start = None;
+        self.paused_at = None;
+        self.paused_secs = 0;
+        self.elapsed_secs = 0;
+        self.record_saved = false;
     }
 }

@@ -1,9 +1,11 @@
+use std::time::Instant;
+
 use ratatui::{
     Frame,
     layout::{Alignment, Constraint, Layout, Rect},
     style::{Color, Style},
     text::{Line, Span},
-    widgets::{Block, BorderType, Borders, Paragraph},
+    widgets::{Block, BorderType, Borders, Clear, Paragraph},
 };
 
 use crate::game::board::{CellView, GameState};
@@ -26,6 +28,8 @@ const CURSOR_FG: Color = Color::Black;
 // ─── Entry point ─────────────────────────────────────────────────────────────
 
 pub fn ui(frame: &mut Frame, app: &mut App) {
+    let now = Instant::now();
+
     let [header_area, board_area, footer_area] = Layout::vertical([
         Constraint::Length(1),
         Constraint::Fill(1),
@@ -33,14 +37,18 @@ pub fn ui(frame: &mut Frame, app: &mut App) {
     ])
     .areas(frame.area());
 
-    render_header(frame, app, header_area);
+    render_header(frame, app, header_area, now);
     render_board(frame, app, board_area);
     render_footer(frame, app, footer_area);
+
+    if app.show_leaderboard {
+        render_leaderboard(frame, app);
+    }
 }
 
 // ─── Header ──────────────────────────────────────────────────────────────────
 
-fn render_header(frame: &mut Frame, app: &mut App, area: Rect) {
+fn render_header(frame: &mut Frame, app: &mut App, area: Rect, now: Instant) {
     let mines_left = app.board.mines_remaining();
     let (status_char, status_style) = match app.board.state {
         GameState::Playing => ("▶", Style::new().fg(Color::Cyan)),
@@ -53,6 +61,7 @@ fn render_header(frame: &mut Frame, app: &mut App, area: Rect) {
         Style::new().fg(Color::Yellow)
     };
     let (cx, cy) = app.cursor;
+    let timer = app.elapsed_display(now);
     let header = Line::from(vec![
         Span::styled(" MINESWEEPER ", Style::new().bold()),
         Span::styled(status_char, status_style),
@@ -61,6 +70,9 @@ fn render_header(frame: &mut Frame, app: &mut App, area: Rect) {
         Span::styled(format!("{:<3}", mines_left), mine_style),
         Span::raw("  "),
         Span::styled(format!("Score: {}", app.score), Style::new().fg(Color::Cyan)),
+        Span::raw("  "),
+        Span::styled("⏱ ", Style::new().fg(Color::DarkGray)),
+        Span::styled(timer, Style::new().fg(Color::White)),
         Span::styled(
             format!("  [{},{}]", cx + 1, cy + 1),
             Style::new().fg(Color::DarkGray),
@@ -324,9 +336,80 @@ fn border_config(app: &App) -> (Style, BorderType, String) {
 
 fn key_hints() -> Span<'static> {
     Span::styled(
-        "  hjkl move  Space reveal  f flag  r restart  q quit",
+        "  hjkl move  Space reveal  f flag  r restart  Tab leaderboard  q quit",
         Style::new().dim(),
     )
+}
+
+fn render_leaderboard(frame: &mut Frame, app: &App) {
+    let total_area = frame.area();
+
+    // Popup dimensions
+    let popup_width = 62u16.min(total_area.width);
+    let row_count = (app.leaderboard_cache.len() as u16).max(1); // at least 1 for "no records"
+    let popup_height = (row_count + 5).min(total_area.height); // header + border + padding
+
+    let x = total_area.left() + total_area.width.saturating_sub(popup_width) / 2;
+    let y = total_area.top() + total_area.height.saturating_sub(popup_height) / 2;
+    let popup_area = Rect::new(x, y, popup_width, popup_height);
+
+    // Clear background
+    frame.render_widget(Clear, popup_area);
+
+    let block = Block::default()
+        .borders(Borders::ALL)
+        .border_type(BorderType::Rounded)
+        .border_style(Style::new().fg(Color::Cyan))
+        .title(" Leaderboard (Tab to close) ")
+        .title_alignment(Alignment::Center)
+        .style(Style::new().bg(Color::Black));
+
+    let inner = block.inner(popup_area);
+    frame.render_widget(block, popup_area);
+
+    if inner.height == 0 {
+        return;
+    }
+
+    // Header row
+    let header = Line::from(Span::styled(
+        format!("{:<8} {:>7}  {:>5}  {:<3}  {}", "DIFF", "SCORE", "TIME", "WIN", "DATE"),
+        Style::new().fg(Color::Yellow).bold(),
+    ));
+    frame.render_widget(
+        Paragraph::new(header),
+        Rect::new(inner.left(), inner.top(), inner.width, 1),
+    );
+
+    if app.leaderboard_cache.is_empty() {
+        if inner.height > 1 {
+            frame.render_widget(
+                Paragraph::new("No records yet — finish a game to appear here!")
+                    .style(Style::new().fg(Color::DarkGray)),
+                Rect::new(inner.left(), inner.top() + 1, inner.width, 1),
+            );
+        }
+        return;
+    }
+
+    for (i, r) in app.leaderboard_cache.iter().enumerate() {
+        let row_y = inner.top() + 1 + i as u16;
+        if row_y >= inner.bottom() {
+            break;
+        }
+        let time_str = format!("{:02}:{:02}", r.time_secs / 60, r.time_secs % 60);
+        let won_str = if r.won { "yes" } else { "no " };
+        let date = if r.timestamp.len() >= 10 { &r.timestamp[..10] } else { &r.timestamp };
+        let row_text = format!(
+            "{:<8} {:>7}  {:>5}  {:<3}  {}",
+            r.difficulty, r.score, time_str, won_str, date
+        );
+        let color = if i == 0 { Color::Green } else { Color::White };
+        frame.render_widget(
+            Paragraph::new(row_text).style(Style::new().fg(color)),
+            Rect::new(inner.left(), row_y, inner.width, 1),
+        );
+    }
 }
 
 fn render_banner(frame: &mut Frame, area: Rect, text: &str, color: Color) {
