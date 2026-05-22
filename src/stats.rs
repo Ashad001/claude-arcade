@@ -5,11 +5,11 @@ use std::time::{SystemTime, UNIX_EPOCH};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct GameRecord {
-    pub difficulty: String,  // "easy" | "medium" | "hard"
+    pub difficulty: String, // "easy" | "medium" | "hard"
     pub score: u32,
     pub time_secs: u64,
     pub won: bool,
-    pub timestamp: String,   // "YYYY-MM-DDTHH:MM:SSZ"
+    pub timestamp: String, // "YYYY-MM-DDTHH:MM:SSZ"
     pub board_width: usize,
     pub board_height: usize,
     pub mine_count: usize,
@@ -132,26 +132,42 @@ mod tests {
     fn leaderboard_sort_order() {
         let records = vec![
             GameRecord {
-                difficulty: "easy".into(), score: 100, time_secs: 60,
-                won: false, timestamp: "".into(),
-                board_width: 9, board_height: 9, mine_count: 10,
+                difficulty: "easy".into(),
+                score: 100,
+                time_secs: 60,
+                won: false,
+                timestamp: "".into(),
+                board_width: 9,
+                board_height: 9,
+                mine_count: 10,
             },
             GameRecord {
-                difficulty: "medium".into(), score: 200, time_secs: 120,
-                won: true, timestamp: "".into(),
-                board_width: 16, board_height: 16, mine_count: 40,
+                difficulty: "medium".into(),
+                score: 200,
+                time_secs: 120,
+                won: true,
+                timestamp: "".into(),
+                board_width: 16,
+                board_height: 16,
+                mine_count: 40,
             },
             GameRecord {
-                difficulty: "medium".into(), score: 300, time_secs: 90,
-                won: true, timestamp: "".into(),
-                board_width: 16, board_height: 16, mine_count: 40,
+                difficulty: "medium".into(),
+                score: 300,
+                time_secs: 90,
+                won: true,
+                timestamp: "".into(),
+                board_width: 16,
+                board_height: 16,
+                mine_count: 40,
             },
         ];
 
         // Inject into a file-free sort test
         let mut sorted = records.clone();
         sorted.sort_by(|a, b| {
-            b.won.cmp(&a.won)
+            b.won
+                .cmp(&a.won)
                 .then(b.score.cmp(&a.score))
                 .then(a.time_secs.cmp(&b.time_secs))
         });

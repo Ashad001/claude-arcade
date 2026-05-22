@@ -8,8 +8,8 @@ use ratatui::{
     widgets::{Block, BorderType, Borders, Clear, Paragraph},
 };
 
-use crate::game::board::{CellView, GameState};
 use crate::game::App;
+use crate::game::board::{CellView, GameState};
 use crate::state::ClaudeStatus;
 
 // ─── Colour palette ──────────────────────────────────────────────────────────
@@ -69,7 +69,10 @@ fn render_header(frame: &mut Frame, app: &mut App, area: Rect, now: Instant) {
         Span::styled("⚑ ", Style::new().fg(Color::Red)),
         Span::styled(format!("{:<3}", mines_left), mine_style),
         Span::raw("  "),
-        Span::styled(format!("Score: {}", app.score), Style::new().fg(Color::Cyan)),
+        Span::styled(
+            format!("Score: {}", app.score),
+            Style::new().fg(Color::Cyan),
+        ),
         Span::raw("  "),
         Span::styled("⏱ ", Style::new().fg(Color::DarkGray)),
         Span::styled(timer, Style::new().fg(Color::White)),
@@ -271,12 +274,20 @@ fn cell_span(view: CellView, is_cursor: bool) -> Span<'static> {
         CellView::Number(0) => {
             // Revealed empty — dark "pressed in" look, clearly different from hidden tiles
             let bg = if is_cursor { CURSOR_BG } else { REVEALED_BG };
-            let fg = if is_cursor { CURSOR_FG } else { Color::DarkGray };
+            let fg = if is_cursor {
+                CURSOR_FG
+            } else {
+                Color::DarkGray
+            };
             Span::styled("· ", Style::new().fg(fg).bg(bg))
         }
 
         CellView::Number(n) => {
-            let fg = if is_cursor { CURSOR_FG } else { number_color(n) };
+            let fg = if is_cursor {
+                CURSOR_FG
+            } else {
+                number_color(n)
+            };
             let bg = if is_cursor { CURSOR_BG } else { REVEALED_BG };
             Span::styled(format!("{n} "), Style::new().fg(fg).bg(bg).bold())
         }
@@ -299,10 +310,7 @@ fn number_color(n: u8) -> Color {
 // ─── Border config ────────────────────────────────────────────────────────────
 
 fn border_config(app: &App) -> (Style, BorderType, String) {
-    let diff = format!(
-        " {} ",
-        format!("{:?}", app.difficulty).to_lowercase()
-    );
+    let diff = format!(" {} ", format!("{:?}", app.difficulty).to_lowercase());
     match &app.claude_state.status {
         ClaudeStatus::Working => (Style::new().fg(Color::Blue), BorderType::Rounded, diff),
         ClaudeStatus::PermissionNeeded => {
@@ -373,7 +381,10 @@ fn render_leaderboard(frame: &mut Frame, app: &App) {
 
     // Header row
     let header = Line::from(Span::styled(
-        format!("{:<8} {:>7}  {:>5}  {:<3}  {}", "DIFF", "SCORE", "TIME", "WIN", "DATE"),
+        format!(
+            "{:<8} {:>7}  {:>5}  {:<3}  {}",
+            "DIFF", "SCORE", "TIME", "WIN", "DATE"
+        ),
         Style::new().fg(Color::Yellow).bold(),
     ));
     frame.render_widget(
@@ -399,7 +410,11 @@ fn render_leaderboard(frame: &mut Frame, app: &App) {
         }
         let time_str = format!("{:02}:{:02}", r.time_secs / 60, r.time_secs % 60);
         let won_str = if r.won { "yes" } else { "no " };
-        let date = if r.timestamp.len() >= 10 { &r.timestamp[..10] } else { &r.timestamp };
+        let date = if r.timestamp.len() >= 10 {
+            &r.timestamp[..10]
+        } else {
+            &r.timestamp
+        };
         let row_text = format!(
             "{:<8} {:>7}  {:>5}  {:<3}  {}",
             r.difficulty, r.score, time_str, won_str, date

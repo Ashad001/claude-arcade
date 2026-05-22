@@ -4,8 +4,8 @@ pub mod render;
 
 use std::time::Instant;
 
-use crate::state::{ClaudeState, ClaudeStatus};
 use crate::Difficulty;
+use crate::state::{ClaudeState, ClaudeStatus};
 use board::{Board, GameState};
 
 pub struct App {
@@ -23,15 +23,15 @@ pub struct App {
     flash_tick: u8,
 
     // Timer tracking
-    pub timer_start: Option<Instant>,   // set on first actual reveal
-    paused_at: Option<Instant>,         // Some while PermissionNeeded is active
-    paused_secs: u64,                   // accumulated pause time
-    pub elapsed_secs: u64,              // frozen final value when game ends
+    pub timer_start: Option<Instant>, // set on first actual reveal
+    paused_at: Option<Instant>,       // Some while PermissionNeeded is active
+    paused_secs: u64,                 // accumulated pause time
+    pub elapsed_secs: u64,            // frozen final value when game ends
 
     // Leaderboard overlay
     pub show_leaderboard: bool,
     pub leaderboard_cache: Vec<crate::stats::GameRecord>,
-    pub record_saved: bool,             // guard: save only once per game
+    pub record_saved: bool, // guard: save only once per game
 }
 
 impl App {
@@ -180,14 +180,15 @@ impl App {
             }
         }
 
-        if self.board.state == GameState::Won
-            && self.claude_state.status == ClaudeStatus::Working
-        {
+        if self.board.state == GameState::Won && self.claude_state.status == ClaudeStatus::Working {
             self.score += self.board.flag_bonus() * self.difficulty.score_multiplier();
         }
 
         // Save record once when the game ends
-        if self.board.state != GameState::Playing && !self.record_saved && self.timer_start.is_some() {
+        if self.board.state != GameState::Playing
+            && !self.record_saved
+            && self.timer_start.is_some()
+        {
             self.elapsed_secs = self.current_elapsed_secs(now);
             let (_, _, mine_count) = self.difficulty.board_params();
             let record = crate::stats::GameRecord {
@@ -219,7 +220,8 @@ impl App {
             return self.elapsed_secs;
         }
         let raw = now.duration_since(start).as_secs();
-        let currently_pausing = self.paused_at
+        let currently_pausing = self
+            .paused_at
             .map(|pa| now.duration_since(pa).as_secs())
             .unwrap_or(0);
         raw.saturating_sub(self.paused_secs + currently_pausing)

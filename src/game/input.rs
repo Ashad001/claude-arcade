@@ -20,11 +20,7 @@ pub enum Action {
 pub fn map_key(key: KeyEvent) -> Option<Action> {
     let is_toggle = matches!(
         key.code,
-        KeyCode::Char('f')
-            | KeyCode::Char('r')
-            | KeyCode::Char('q')
-            | KeyCode::Esc
-            | KeyCode::Tab
+        KeyCode::Char('f') | KeyCode::Char('r') | KeyCode::Char('q') | KeyCode::Esc | KeyCode::Tab
     );
 
     if is_toggle && key.kind != KeyEventKind::Press {

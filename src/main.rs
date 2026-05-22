@@ -8,7 +8,10 @@ mod stats;
 mod tui;
 
 #[derive(Debug, Parser)]
-#[command(name = "claude-arcade", about = "Terminal Minesweeper for Claude Code sessions")]
+#[command(
+    name = "claude-arcade",
+    about = "Terminal Minesweeper for Claude Code sessions"
+)]
 struct Cli {
     #[command(subcommand)]
     command: Commands,
@@ -85,12 +88,19 @@ fn print_stats() -> Result<()> {
         println!("No games recorded yet. Play some games first!");
         return Ok(());
     }
-    println!("{:<8} {:>7}  {:>5}  {:<3}  {}", "DIFF", "SCORE", "TIME", "WIN", "DATE");
+    println!(
+        "{:<8} {:>7}  {:>5}  {:<3}  {}",
+        "DIFF", "SCORE", "TIME", "WIN", "DATE"
+    );
     println!("{}", "─".repeat(42));
     for r in &records {
         let time_str = format!("{:02}:{:02}", r.time_secs / 60, r.time_secs % 60);
         let won_str = if r.won { "yes" } else { "no " };
-        let date = if r.timestamp.len() >= 10 { &r.timestamp[..10] } else { &r.timestamp };
+        let date = if r.timestamp.len() >= 10 {
+            &r.timestamp[..10]
+        } else {
+            &r.timestamp
+        };
         println!(
             "{:<8} {:>7}  {:>5}  {:<3}  {}",
             r.difficulty, r.score, time_str, won_str, date

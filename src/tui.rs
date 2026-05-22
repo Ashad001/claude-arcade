@@ -2,9 +2,9 @@ use color_eyre::eyre::Result;
 use crossterm::event::{self, Event, KeyCode, KeyModifiers};
 use std::time::{Duration, Instant};
 
-use crate::game::{render, App};
-use crate::state::read_state;
 use crate::Difficulty;
+use crate::game::{App, render};
+use crate::state::read_state;
 
 pub fn run(difficulty: Difficulty) -> Result<()> {
     install_panic_hook();
@@ -30,9 +30,7 @@ fn run_loop(terminal: &mut ratatui::DefaultTerminal, difficulty: Difficulty) -> 
         if event::poll(Duration::from_millis(100))? {
             if let Event::Key(key) = event::read()? {
                 // Ctrl-C always quits
-                if key.modifiers.contains(KeyModifiers::CONTROL)
-                    && key.code == KeyCode::Char('c')
-                {
+                if key.modifiers.contains(KeyModifiers::CONTROL) && key.code == KeyCode::Char('c') {
                     break;
                 }
                 if let Some(action) = crate::game::input::map_key(key) {
