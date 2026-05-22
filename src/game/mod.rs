@@ -174,10 +174,11 @@ impl App {
             print!("\x07");
         }
 
-        if let Some(since) = self.done_since {
-            if now.duration_since(since).as_secs() >= 3 {
-                self.done_since = None;
-            }
+        if self
+            .done_since
+            .is_some_and(|since| now.duration_since(since).as_secs() >= 3)
+        {
+            self.done_since = None;
         }
 
         if self.board.state == GameState::Won && self.claude_state.status == ClaudeStatus::Working {

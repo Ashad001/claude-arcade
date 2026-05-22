@@ -27,15 +27,15 @@ fn run_loop(terminal: &mut ratatui::DefaultTerminal, difficulty: Difficulty) -> 
 
     loop {
         // 1. Poll keyboard (100ms timeout = tick rate)
-        if event::poll(Duration::from_millis(100))? {
-            if let Event::Key(key) = event::read()? {
-                // Ctrl-C always quits
-                if key.modifiers.contains(KeyModifiers::CONTROL) && key.code == KeyCode::Char('c') {
-                    break;
-                }
-                if let Some(action) = crate::game::input::map_key(key) {
-                    app.handle_action(action);
-                }
+        if event::poll(Duration::from_millis(100))?
+            && let Event::Key(key) = event::read()?
+        {
+            // Ctrl-C always quits
+            if key.modifiers.contains(KeyModifiers::CONTROL) && key.code == KeyCode::Char('c') {
+                break;
+            }
+            if let Some(action) = crate::game::input::map_key(key) {
+                app.handle_action(action);
             }
         }
 

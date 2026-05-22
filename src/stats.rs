@@ -90,8 +90,7 @@ pub fn append_record(record: GameRecord) -> std::io::Result<()> {
         records.drain(..drop);
     }
 
-    let json = serde_json::to_string_pretty(&records)
-        .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))?;
+    let json = serde_json::to_string_pretty(&records).map_err(std::io::Error::other)?;
 
     // Atomic write: temp file → rename
     let tmp = path.with_extension("json.tmp");

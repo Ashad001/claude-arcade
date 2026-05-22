@@ -89,8 +89,8 @@ fn print_stats() -> Result<()> {
         return Ok(());
     }
     println!(
-        "{:<8} {:>7}  {:>5}  {:<3}  {}",
-        "DIFF", "SCORE", "TIME", "WIN", "DATE"
+        "{:<8} {:>7}  {:>5}  {:<3}  DATE",
+        "DIFF", "SCORE", "TIME", "WIN"
     );
     println!("{}", "─".repeat(42));
     for r in &records {
