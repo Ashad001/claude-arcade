@@ -30,6 +30,41 @@ Then wire up the Claude Code hooks (one-time):
 claude-arcade install
 ```
 
+### Windows (via WSL2)
+
+Windows users can run claude-arcade by using WSL2 — everything (Claude Code, tmux, and the game) runs inside the Linux environment, so the POSIX hook scripts work normally.
+
+**1. Set up WSL2** (PowerShell, run as admin):
+
+```powershell
+wsl --install
+```
+
+Restart when prompted, then open a WSL terminal (Ubuntu by default).
+
+**2. Install dependencies inside WSL:**
+
+```bash
+sudo apt update && sudo apt install tmux jq
+```
+
+**3. Install Claude Code inside WSL:**
+
+```bash
+npm install -g @anthropic-ai/claude-code
+```
+
+**4. Install claude-arcade inside WSL:**
+
+```bash
+curl --proto '=https' --tlsv1.2 -LsSf \
+  https://github.com/Ashad001/claude-arcade/releases/latest/download/claude-arcade-installer.sh | sh
+
+claude-arcade install
+```
+
+**Important:** Run `claude` from the WSL terminal, not from PowerShell or Windows Terminal using a Windows shell. The hooks are registered in the WSL home directory (`~/.claude/`) — a separate config from any Windows-native Claude Code install. Using the wrong terminal means the hooks won't fire.
+
 ### Homebrew (macOS)
 
 ```bash
@@ -46,7 +81,7 @@ cargo install claude-arcade
 
 - **tmux** — the game opens in a split pane
 - **Claude Code** — hooks fire on tool calls / notifications
-- macOS or Linux (Windows support planned for v2)
+- macOS or Linux (Windows users: see [WSL2 instructions](#windows-via-wsl2) above)
 
 Install tmux if missing:
 
@@ -86,6 +121,7 @@ The **permission state freezes the game** and pauses your score multiplier — m
 | `Space` / `Enter` | Reveal cell |
 | `f` | Toggle flag |
 | `r` | Restart board |
+| `Tab` | Toggle leaderboard overlay |
 | `q` / `Esc` | Quit |
 
 ## Difficulty
