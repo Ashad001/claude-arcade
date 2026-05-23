@@ -25,6 +25,8 @@ and never miss a permission prompt again.
 [![Built with Rust](https://img.shields.io/badge/built%20with-Rust-CE422B?style=flat-square&logo=rust&logoColor=white)](https://www.rust-lang.org/)
 [![Platform](https://img.shields.io/badge/platform-Linux%20%7C%20macOS%20%7C%20WSL2-lightgrey?style=flat-square)](#install)
 
+![claude-arcade screenshot](assets/screenshot.png)
+
 </div>
 
 ---
