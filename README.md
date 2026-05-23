@@ -1,4 +1,4 @@
-<div align="center">
+
 
 ```
  ██████╗██╗      █████╗ ██╗   ██╗██████╗ ███████╗
@@ -17,34 +17,14 @@
 
 **Stop doom-scrolling. Start playing.**
 
-Terminal Minesweeper that runs beside Claude Code — so you stay focused,\
+Terminal Minesweeper that runs beside Claude Code — so you stay focused,  
 and never miss a permission prompt again.
 
-[![Release](https://img.shields.io/github/v/release/Ashad001/claude-arcade?style=flat-square&logo=github&color=orange)](https://github.com/Ashad001/claude-arcade/releases)
-[![License: MIT](https://img.shields.io/badge/license-MIT-blue?style=flat-square)](LICENSE)
-[![Built with Rust](https://img.shields.io/badge/built%20with-Rust-CE422B?style=flat-square&logo=rust&logoColor=white)](https://www.rust-lang.org/)
-[![Platform](https://img.shields.io/badge/platform-Linux%20%7C%20macOS%20%7C%20WSL2-lightgrey?style=flat-square)](#install)
+[Release](https://github.com/Ashad001/claude-arcade/releases)
+[License: MIT](LICENSE)
+[Built with Rust](https://www.rust-lang.org/)
+[Platform](#install)
 
-![claude-arcade screenshot](assets/screenshot.png)
-
-</div>
-
----
-
-```
-┌─────────────────────────────┬──────────────────────────────────────┐
-│  claude                     │  claude-arcade                       │
-│                             │                                      │
-│  > refactor auth module     │   MINESWEEPER ▶  ⚑ 37   Score: 840  │
-│  ⏺ working: Edit            │  ╭──────── medium ──────────────╮    │
-│                             │  │ ▒▒ ▒▒ ▒▒  1  ·  ▒▒ ▒▒ ▒▒ ▒▒ │    │
-│                             │  │ ▒▒  1  ·  ·   1  2  ▒▒ ▒▒ ▒▒ │    │
-│                             │  │ ▒▒ ▒▒ ██  2  ▒▒ ▒▒  3  ▒▒ ▒▒ │    │
-│                             │  │ ▒▒ ▒▒ ▒▒ ▒▒  1  ·  ▒▒ ▒▒ ▒▒ │    │
-│                             │  ╰───────────────────────────────╯   │
-│                             │   ⏺ Claude is working: Edit          │
-└─────────────────────────────┴──────────────────────────────────────┘
-```
 
 > **The problem:** Claude is thinking. You open Twitter. You miss the permission prompt. You lose 20 minutes.
 >
@@ -131,26 +111,30 @@ cargo install claude-arcade
 
 ## Visual states
 
-| State | Border | Footer | Score |
-|---|---|---|---|
-| Working | 🔵 Blue | `⏺ Claude is working: <tool>` | Counting |
-| Permission needed | 🔴 **Flashing red** + 🔔 bell | `⚠ CLAUDE NEEDS PERMISSION` | **Frozen** |
-| Idle | 🟡 Yellow | `⏸ Claude is waiting` | Counting |
-| Done | 🟢 Green (3s) | `✓ Claude finished` | Counting |
-| No session | — Plain | Key hints | Counting |
+
+| State             | Border                        | Footer                        | Score      |
+| ----------------- | ----------------------------- | ----------------------------- | ---------- |
+| Working           | 🔵 Blue                       | `⏺ Claude is working: <tool>` | Counting   |
+| Permission needed | 🔴 **Flashing red** + 🔔 bell | `⚠ CLAUDE NEEDS PERMISSION`   | **Frozen** |
+| Idle              | 🟡 Yellow                     | `⏸ Claude is waiting`         | Counting   |
+| Done              | 🟢 Green (3s)                 | `✓ Claude finished`           | Counting   |
+| No session        | — Plain                       | Key hints                     | Counting   |
+
 
 ---
 
 ## Controls
 
-| Key | Action |
-|---|---|
-| `hjkl` / arrow keys | Move cursor |
-| `Space` / `Enter` | Reveal cell |
-| `f` | Toggle flag |
-| `r` | Restart |
-| `Tab` | Leaderboard overlay |
-| `q` / `Esc` | Quit |
+
+| Key                 | Action              |
+| ------------------- | ------------------- |
+| `hjkl` / arrow keys | Move cursor         |
+| `Space` / `Enter`   | Reveal cell         |
+| `f`                 | Toggle flag         |
+| `r`                 | Restart             |
+| `Tab`               | Leaderboard overlay |
+| `q` / `Esc`         | Quit                |
+
 
 ---
 
@@ -225,10 +209,9 @@ No telemetry. No network calls after install. The game reads a local file that t
 
 ---
 
-<div align="center">
+
 
 Built with Rust + [ratatui](https://ratatui.rs) · MIT License
 
 *The best code review is one you're actually present for.*
 
-</div>
