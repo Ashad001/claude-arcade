@@ -1,75 +1,123 @@
-# claude-arcade
-
-Terminal Minesweeper that runs in a tmux pane while Claude Code works — so you stay in the terminal instead of doom-scrolling Twitter, and actually see it when Claude needs your permission.
+<div align="center">
 
 ```
-┌─────────────────────────┬─────────────────────────────┐
-│ claude (main pane)      │ claude-arcade (side pane)   │
-│                         │                             │
-│ > write me a script     │   MINESWEEPER  ●  Score:42  │
-│ ⏺ working...            │   ██ ██ 1  .  ██ ██ ██ ██   │
-│                         │   ██  1  .  .   1  2 ██ ██  │
-│                         │   ⏺ Claude is working: Bash  │
-└─────────────────────────┴─────────────────────────────┘
+ ██████╗██╗      █████╗ ██╗   ██╗██████╗ ███████╗
+██╔════╝██║     ██╔══██╗██║   ██║██╔══██╗██╔════╝
+██║     ██║     ███████║██║   ██║██║  ██║█████╗
+██║     ██║     ██╔══██║██║   ██║██║  ██║██╔══╝
+╚██████╗███████╗██║  ██║╚██████╔╝██████╔╝███████╗
+ ╚═════╝╚══════╝╚═╝  ╚═╝ ╚═════╝ ╚═════╝ ╚══════╝
+         █████╗ ██████╗  ██████╗ █████╗ ██████╗ ███████╗
+        ██╔══██╗██╔══██╗██╔════╝██╔══██╗██╔══██╗██╔════╝
+        ███████║██████╔╝██║     ███████║██║  ██║█████╗
+        ██╔══██║██╔══██╗██║     ██╔══██║██║  ██║██╔══╝
+        ██║  ██║██║  ██║╚██████╗██║  ██║██████╔╝███████╗
+        ╚═╝  ╚═╝╚═╝  ╚═╝ ╚═════╝╚═╝  ╚═╝╚═════╝ ╚══════╝
 ```
 
-When Claude needs a permission prompt, the game **freezes**, the border **flashes red**, and a **bell rings** — impossible to miss without leaving the terminal.
+**Stop doom-scrolling. Start playing.**
+
+Terminal Minesweeper that runs beside Claude Code — so you stay focused,\
+and never miss a permission prompt again.
+
+[![Release](https://img.shields.io/github/v/release/Ashad001/claude-arcade?style=flat-square&logo=github&color=orange)](https://github.com/Ashad001/claude-arcade/releases)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue?style=flat-square)](LICENSE)
+[![Built with Rust](https://img.shields.io/badge/built%20with-Rust-CE422B?style=flat-square&logo=rust&logoColor=white)](https://www.rust-lang.org/)
+[![Platform](https://img.shields.io/badge/platform-Linux%20%7C%20macOS%20%7C%20WSL2-lightgrey?style=flat-square)](#install)
+
+</div>
+
+---
+
+```
+┌─────────────────────────────┬──────────────────────────────────────┐
+│  claude                     │  claude-arcade                       │
+│                             │                                      │
+│  > refactor auth module     │   MINESWEEPER ▶  ⚑ 37   Score: 840  │
+│  ⏺ working: Edit            │  ╭──────── medium ──────────────╮    │
+│                             │  │ ▒▒ ▒▒ ▒▒  1  ·  ▒▒ ▒▒ ▒▒ ▒▒ │    │
+│                             │  │ ▒▒  1  ·  ·   1  2  ▒▒ ▒▒ ▒▒ │    │
+│                             │  │ ▒▒ ▒▒ ██  2  ▒▒ ▒▒  3  ▒▒ ▒▒ │    │
+│                             │  │ ▒▒ ▒▒ ▒▒ ▒▒  1  ·  ▒▒ ▒▒ ▒▒ │    │
+│                             │  ╰───────────────────────────────╯   │
+│                             │   ⏺ Claude is working: Edit          │
+└─────────────────────────────┴──────────────────────────────────────┘
+```
+
+> **The problem:** Claude is thinking. You open Twitter. You miss the permission prompt. You lose 20 minutes.
+>
+> **The fix:** A game that runs in your terminal keeps your eyes in the right place.
+
+---
+
+## How it works
+
+Claude Code fires shell hooks on every tool call. Those hooks write a tiny JSON file. The game reads it every 100ms and reacts:
+
+```
+Claude working    →  blue border      ⏺ Claude is working: Bash
+Permission needed →  RED FLASHING 🔔  ⚠ CLAUDE NEEDS PERMISSION — SWITCH PANES
+Claude idle       →  yellow border    ⏸ Claude is waiting for your input
+Claude done       →  green border ✓   Claude finished  (auto-clears after 3s)
+```
+
+**When permission is needed:** the game freezes, the border flashes red, a terminal bell rings, and your score multiplier pauses. Missing a prompt has an actual cost.
+
+---
 
 ## Install
 
-**macOS / Linux** (requires [tmux](https://github.com/tmux/tmux/wiki/Installing)):
+### Linux / macOS
+
+> Requires [tmux](https://github.com/tmux/tmux/wiki/Installing) and [Claude Code](https://claude.ai/code)
 
 ```bash
-curl --proto '=https' --tlsv1.2 -LsSf \
-  https://github.com/Ashad001/claude-arcade/releases/latest/download/claude-arcade-installer.sh | sh
-```
+# 1. Download the binary for your platform
+# Linux x86_64
+curl -LsSf https://github.com/Ashad001/claude-arcade/releases/latest/download/claude-arcade-v0.1.0-x86_64-unknown-linux-gnu.tar.gz | tar -xz -C ~/.local/bin/
 
-Then wire up the Claude Code hooks (one-time):
+# Linux ARM64
+curl -LsSf https://github.com/Ashad001/claude-arcade/releases/latest/download/claude-arcade-v0.1.0-aarch64-unknown-linux-gnu.tar.gz | tar -xz -C ~/.local/bin/
 
-```bash
+# macOS (Apple Silicon)
+curl -LsSf https://github.com/Ashad001/claude-arcade/releases/latest/download/claude-arcade-v0.1.0-aarch64-apple-darwin.tar.gz | tar -xz -C ~/.local/bin/
+
+# 2. Wire up Claude Code hooks (one-time)
 claude-arcade install
+
+# 3. Start a tmux session, then launch Claude inside it
+tmux new-session
+claude
 ```
+
+The game opens automatically in a split pane every time Claude starts working.
 
 ### Windows (via WSL2)
 
-Windows users can run claude-arcade by using WSL2 — everything (Claude Code, tmux, and the game) runs inside the Linux environment, so the POSIX hook scripts work normally.
-
-**1. Set up WSL2** (PowerShell, run as admin):
+Everything runs inside WSL2 — the POSIX hooks, tmux, and the game itself.
 
 ```powershell
+# 1. Install WSL2 (PowerShell, run as admin)
 wsl --install
 ```
 
-Restart when prompted, then open a WSL terminal (Ubuntu by default).
-
-**2. Install dependencies inside WSL:**
-
 ```bash
+# 2. Inside WSL — install dependencies
 sudo apt update && sudo apt install tmux jq
-```
 
-**3. Install Claude Code inside WSL:**
-
-```bash
+# 3. Install Claude Code inside WSL
 npm install -g @anthropic-ai/claude-code
-```
 
-**4. Install claude-arcade inside WSL:**
-
-```bash
-curl --proto '=https' --tlsv1.2 -LsSf \
-  https://github.com/Ashad001/claude-arcade/releases/latest/download/claude-arcade-installer.sh | sh
-
+# 4. Install claude-arcade
+curl -LsSf https://github.com/Ashad001/claude-arcade/releases/latest/download/claude-arcade-v0.1.0-x86_64-unknown-linux-gnu.tar.gz | tar -xz -C ~/.local/bin/
 claude-arcade install
+
+# 5. Always run claude from inside tmux, inside WSL
+tmux new-session
+claude
 ```
 
-**Important:** Run `claude` from the WSL terminal, not from PowerShell or Windows Terminal using a Windows shell. The hooks are registered in the WSL home directory (`~/.claude/`) — a separate config from any Windows-native Claude Code install. Using the wrong terminal means the hooks won't fire.
-
-### Homebrew (macOS)
-
-```bash
-brew install Ashad001/tap/claude-arcade
-```
+> **Important:** Run `claude` from the WSL terminal — not PowerShell or Windows Terminal. The hooks live in `~/.claude/` inside WSL, separate from any Windows-native Claude install.
 
 ### Cargo (Rust developers)
 
@@ -77,88 +125,87 @@ brew install Ashad001/tap/claude-arcade
 cargo install claude-arcade
 ```
 
-## Requirements
+---
 
-- **tmux** — the game opens in a split pane
-- **Claude Code** — hooks fire on tool calls / notifications
-- macOS or Linux (Windows users: see [WSL2 instructions](#windows-via-wsl2) above)
+## Visual states
 
-Install tmux if missing:
+| State | Border | Footer | Score |
+|---|---|---|---|
+| Working | 🔵 Blue | `⏺ Claude is working: <tool>` | Counting |
+| Permission needed | 🔴 **Flashing red** + 🔔 bell | `⚠ CLAUDE NEEDS PERMISSION` | **Frozen** |
+| Idle | 🟡 Yellow | `⏸ Claude is waiting` | Counting |
+| Done | 🟢 Green (3s) | `✓ Claude finished` | Counting |
+| No session | — Plain | Key hints | Counting |
 
-```bash
-# macOS
-brew install tmux
-
-# Debian/Ubuntu
-sudo apt install tmux
-
-# Fedora
-sudo dnf install tmux
-
-# Arch
-sudo pacman -S tmux
-```
-
-## How it works
-
-Every Claude Code tool call fires a shell hook that writes a small JSON file to `~/.claude-arcade/state.json`. The game polls that file every 100ms and reacts visually:
-
-| Claude status | Border | Footer message |
-|---|---|---|
-| Working | Blue | `⏺ Claude is working: Bash` |
-| Needs permission | **Red flashing** + 🔔 bell | `⚠ CLAUDE NEEDS PERMISSION — SWITCH PANES` |
-| Idle / waiting | Yellow | `⏸ Claude is waiting for your input` |
-| Done | Green (3s) | `✓ Claude finished` |
-| No session | Plain | Key hint bar |
-
-The **permission state freezes the game** and pauses your score multiplier — missing a permission prompt has a cost.
+---
 
 ## Controls
 
 | Key | Action |
 |---|---|
-| Arrow keys / `hjkl` | Move cursor |
+| `hjkl` / arrow keys | Move cursor |
 | `Space` / `Enter` | Reveal cell |
 | `f` | Toggle flag |
-| `r` | Restart board |
-| `Tab` | Toggle leaderboard overlay |
+| `r` | Restart |
+| `Tab` | Leaderboard overlay |
 | `q` / `Esc` | Quit |
+
+---
 
 ## Difficulty
 
 ```bash
-claude-arcade play --difficulty easy    # 9×9,  10 mines
-claude-arcade play --difficulty medium  # 16×16, 40 mines  (default)
-claude-arcade play --difficulty hard    # 30×16, 99 mines
+claude-arcade play                        # 16×16, 40 mines (default)
+claude-arcade play --difficulty easy      #  9×9,  10 mines
+claude-arcade play --difficulty hard      # 30×16, 99 mines
 ```
 
-## Local development & testing
+Harder difficulty = higher score multiplier.
+
+---
+
+## Leaderboard & stats
+
+Games are saved to `~/.claude-arcade/stats.json` after each round.
 
 ```bash
-# 1. Build
-cargo build --release
+# Print top 10 in the terminal
+claude-arcade stats
+```
 
-# 2. Play standalone (no Claude integration)
-cargo run -- play
+Press `Tab` in-game to toggle the leaderboard overlay.
 
-# 3. Simulate hook events manually
+---
+
+## Simulate hook events (for testing)
+
+```bash
+# Working
 echo '{"status":"working","tool":"Bash","updated_at":"2026-05-22T14:00:00Z"}' \
   > ~/.claude-arcade/state.json
 
+# Permission needed — watch it flash red and ring
 echo '{"status":"permission_needed","updated_at":"2026-05-22T14:00:01Z"}' \
   > ~/.claude-arcade/state.json
-# → red flashing border, terminal bell, game freezes
 
+# Done
 echo '{"status":"done","updated_at":"2026-05-22T14:00:02Z"}' \
   > ~/.claude-arcade/state.json
-# → green border for 3 seconds
-
-# 4. Install hooks (dry-run)
-cargo run -- install --dry-run
-
-# 5. Run tests
-cargo test
 ```
+
+---
+
+## Building from source
+
+```bash
+git clone https://github.com/Ashad001/claude-arcade
+cd claude-arcade
+cargo build --release
+cargo test
+cargo run -- play
+```
+
+---
 
 ## Uninstall
 
@@ -166,21 +213,20 @@ cargo test
 claude-arcade uninstall
 ```
 
-Removes the Claude Code hooks and the `~/.claude/hooks/claude-arcade/` directory. Your `~/.claude-arcade/stats.json` score history is kept.
+Removes hooks and `~/.claude/hooks/claude-arcade/`. Your `~/.claude-arcade/stats.json` score history is kept.
+
+---
 
 ## Privacy
 
-No telemetry. No network calls. Ever. The only outbound request in the entire stack is the one-time binary download at install time. The game only reads a local file that the hooks write.
+No telemetry. No network calls after install. The game reads a local file that the hooks write — nothing leaves your machine.
 
-## How to release (maintainers)
+---
 
-```bash
-git tag v0.1.0
-git push origin v0.1.0
-```
+<div align="center">
 
-GitHub Actions builds binaries for all four targets and publishes the release automatically. See `.github/workflows/release.yml`.
+Built with Rust + [ratatui](https://ratatui.rs) · MIT License
 
-## License
+*The best code review is one you're actually present for.*
 
-MIT
+</div>
