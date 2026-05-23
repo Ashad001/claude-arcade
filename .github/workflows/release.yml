@@ -55,29 +55,9 @@ jobs:
           name: artifact-${{ matrix.target }}
           path: ${{ env.ARCHIVE }}
 
-  installer:
-    name: generate installer script
-    runs-on: ubuntu-22.04
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Install cargo-dist
-        run: |
-          curl --proto '=https' --tlsv1.2 -LsSf \
-            https://github.com/axodotdev/cargo-dist/releases/download/v0.28.0/cargo-dist-installer.sh | sh
-
-      - name: Generate shell installer
-        run: dist generate --tag=${{ github.ref_name }}
-
-      - uses: actions/upload-artifact@v4
-        with:
-          name: artifact-installer
-          path: |
-            *.sh
-
   release:
     name: publish GitHub release
-    needs: [build, installer]
+    needs: [build]
     runs-on: ubuntu-22.04
     env:
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
