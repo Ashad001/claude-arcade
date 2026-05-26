@@ -1,8 +1,9 @@
 use clap::{Parser, Subcommand};
 use color_eyre::eyre::Result;
 
-mod game;
+mod games;
 mod install;
+mod menu;
 mod state;
 mod stats;
 mod tui;
@@ -10,7 +11,7 @@ mod tui;
 #[derive(Debug, Parser)]
 #[command(
     name = "claude-arcade",
-    about = "Terminal Minesweeper for Claude Code sessions"
+    about = "Retro terminal games for Claude Code sessions — Minesweeper · Tic Tac Toe · 2048"
 )]
 struct Cli {
     #[command(subcommand)]
@@ -19,12 +20,8 @@ struct Cli {
 
 #[derive(Debug, Subcommand)]
 enum Commands {
-    /// Launch the Minesweeper game
-    Play {
-        /// Game difficulty
-        #[arg(long, value_enum, default_value = "medium")]
-        difficulty: Difficulty,
-    },
+    /// Launch the game menu (Minesweeper, Tic Tac Toe, 2048)
+    Play,
     /// Wire up Claude Code hooks (requires tmux)
     Install {
         /// Apply without prompting
@@ -44,38 +41,12 @@ enum Commands {
     Stats,
 }
 
-#[derive(Debug, Clone, clap::ValueEnum)]
-pub enum Difficulty {
-    Easy,
-    Medium,
-    Hard,
-}
-
-impl Difficulty {
-    /// Returns (width, height, mines)
-    pub fn board_params(&self) -> (usize, usize, usize) {
-        match self {
-            Difficulty::Easy => (9, 9, 10),
-            Difficulty::Medium => (16, 16, 40),
-            Difficulty::Hard => (30, 16, 99),
-        }
-    }
-
-    pub fn score_multiplier(&self) -> u32 {
-        match self {
-            Difficulty::Easy => 1,
-            Difficulty::Medium => 2,
-            Difficulty::Hard => 4,
-        }
-    }
-}
-
 fn main() -> Result<()> {
     color_eyre::install()?;
     let cli = Cli::parse();
 
     match cli.command {
-        Commands::Play { difficulty } => tui::run(difficulty),
+        Commands::Play => tui::run(),
         Commands::Install { yes, dry_run } => install::install(yes, dry_run),
         Commands::Uninstall { yes } => install::uninstall(yes),
         Commands::Stats => print_stats(),
@@ -89,10 +60,10 @@ fn print_stats() -> Result<()> {
         return Ok(());
     }
     println!(
-        "{:<8} {:>7}  {:>5}  {:<3}  DATE",
-        "DIFF", "SCORE", "TIME", "WIN"
+        "{:<14} {:>7}  {:>5}  {:<3}  DATE",
+        "GAME / DIFF", "SCORE", "TIME", "WIN"
     );
-    println!("{}", "─".repeat(42));
+    println!("{}", "─".repeat(46));
     for r in &records {
         let time_str = format!("{:02}:{:02}", r.time_secs / 60, r.time_secs % 60);
         let won_str = if r.won { "yes" } else { "no " };
@@ -101,9 +72,10 @@ fn print_stats() -> Result<()> {
         } else {
             &r.timestamp
         };
+        let label = format!("{}/{}", r.game, r.difficulty);
         println!(
-            "{:<8} {:>7}  {:>5}  {:<3}  {}",
-            r.difficulty, r.score, time_str, won_str, date
+            "{:<14} {:>7}  {:>5}  {:<3}  {}",
+            label, r.score, time_str, won_str, date
         );
     }
     Ok(())

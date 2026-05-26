@@ -5,14 +5,25 @@ use std::time::{SystemTime, UNIX_EPOCH};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct GameRecord {
-    pub difficulty: String, // "easy" | "medium" | "hard"
+    /// "minesweeper" | "tictactoe" | "2048"
+    #[serde(default = "default_game")]
+    pub game: String,
+    pub difficulty: String,
     pub score: u32,
     pub time_secs: u64,
     pub won: bool,
     pub timestamp: String, // "YYYY-MM-DDTHH:MM:SSZ"
+    // minesweeper-specific (zero for other games)
+    #[serde(default)]
     pub board_width: usize,
+    #[serde(default)]
     pub board_height: usize,
+    #[serde(default)]
     pub mine_count: usize,
+}
+
+fn default_game() -> String {
+    "minesweeper".into()
 }
 
 pub fn stats_file_path() -> Option<PathBuf> {
@@ -32,7 +43,7 @@ fn format_rfc3339(unix_secs: u64) -> String {
     let sec = (unix_secs % 60) as u32;
     let min = ((unix_secs / 60) % 60) as u32;
     let hour = ((unix_secs / 3600) % 24) as u32;
-    let days = unix_secs / 86400; // days since 1970-01-01
+    let days = unix_secs / 86400;
 
     let (year, month, day) = days_to_ymd(days);
     format!(
@@ -41,10 +52,7 @@ fn format_rfc3339(unix_secs: u64) -> String {
     )
 }
 
-/// Convert a count of days since the Unix epoch to (year, month, day).
-/// Uses the standard proleptic Gregorian algorithm.
 fn days_to_ymd(days: u64) -> (u32, u32, u32) {
-    // Algorithm from http://howardhinnant.github.io/date_algorithms.html
     let z = days as i64 + 719_468;
     let era = if z >= 0 { z } else { z - 146_096 } / 146_097;
     let doe = (z - era * 146_097) as u64;
@@ -70,8 +78,6 @@ pub fn read_stats() -> Vec<GameRecord> {
 }
 
 /// Append a record to the stats file.
-/// Creates the file if it doesn't exist. Caps history at 100 entries (oldest dropped).
-/// Errors are returned but should be ignored by the caller so the game never crashes.
 pub fn append_record(record: GameRecord) -> std::io::Result<()> {
     let Some(path) = stats_file_path() else {
         return Ok(());
@@ -84,15 +90,12 @@ pub fn append_record(record: GameRecord) -> std::io::Result<()> {
     let mut records = read_stats();
     records.push(record);
 
-    // Keep the most recent 100 entries
     if records.len() > 100 {
         let drop = records.len() - 100;
         records.drain(..drop);
     }
 
     let json = serde_json::to_string_pretty(&records).map_err(std::io::Error::other)?;
-
-    // Atomic write: temp file → rename
     let tmp = path.with_extension("json.tmp");
     fs::write(&tmp, json)?;
     fs::rename(&tmp, &path)?;
@@ -123,7 +126,6 @@ mod tests {
 
     #[test]
     fn rfc3339_known_date() {
-        // 2026-05-22T14:30:00Z = 1,779,460,200 seconds
         assert_eq!(format_rfc3339(1_779_460_200), "2026-05-22T14:30:00Z");
     }
 
@@ -131,6 +133,7 @@ mod tests {
     fn leaderboard_sort_order() {
         let records = vec![
             GameRecord {
+                game: "minesweeper".into(),
                 difficulty: "easy".into(),
                 score: 100,
                 time_secs: 60,
@@ -141,6 +144,7 @@ mod tests {
                 mine_count: 10,
             },
             GameRecord {
+                game: "minesweeper".into(),
                 difficulty: "medium".into(),
                 score: 200,
                 time_secs: 120,
@@ -151,6 +155,7 @@ mod tests {
                 mine_count: 40,
             },
             GameRecord {
+                game: "minesweeper".into(),
                 difficulty: "medium".into(),
                 score: 300,
                 time_secs: 90,
@@ -162,7 +167,6 @@ mod tests {
             },
         ];
 
-        // Inject into a file-free sort test
         let mut sorted = records.clone();
         sorted.sort_by(|a, b| {
             b.won

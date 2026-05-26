@@ -8,20 +8,15 @@ use ratatui::{
     widgets::{Block, BorderType, Borders, Clear, Paragraph},
 };
 
-use crate::game::App;
-use crate::game::board::{CellView, GameState};
+use crate::games::minesweeper::App;
+use crate::games::minesweeper::board::{CellView, GameState};
 use crate::state::ClaudeStatus;
 
 // ─── Colour palette ──────────────────────────────────────────────────────────
 
-/// Hidden tile: light enough to pop against any dark terminal background
 const HIDDEN_BG: Color = Color::Rgb(90, 100, 120);
 const HIDDEN_FG: Color = Color::Rgb(130, 145, 170);
-
-/// Revealed (pressed-in) tile — clearly darker than hidden
 const REVEALED_BG: Color = Color::Rgb(28, 30, 38);
-
-/// Cursor highlight
 const CURSOR_BG: Color = Color::Rgb(230, 190, 0);
 const CURSOR_FG: Color = Color::Black;
 
@@ -98,15 +93,12 @@ fn render_board(frame: &mut Frame, app: &mut App, area: Rect) {
     let inner = block.inner(area);
     frame.render_widget(block, area);
 
-    // Each cell = 2 chars wide. How many columns fit?
     let visible_cols = ((inner.width as usize) / 2).min(app.board.width);
     let visible_rows = (inner.height as usize).min(app.board.height);
 
-    // Update viewport so cursor stays on screen (no inserts into spans — kept clean)
     app.scroll_to_cursor(visible_cols, visible_rows);
     let (vx, vy) = app.viewport;
 
-    // Vertical centering when board fits fully
     let y_pad = if app.board.height < visible_rows {
         (inner.height as usize).saturating_sub(app.board.height) / 2
     } else {
@@ -141,7 +133,6 @@ fn render_board(frame: &mut Frame, app: &mut App, area: Rect) {
         );
     }
 
-    // Scroll arrows rendered separately — never mixed into cell spans
     render_scroll_arrows(frame, inner, app, visible_cols, visible_rows);
 
     if app.board.state == GameState::Won {
@@ -151,7 +142,6 @@ fn render_board(frame: &mut Frame, app: &mut App, area: Rect) {
     }
 }
 
-/// Draw directional arrows at the border — never inserted into cell rows.
 fn render_scroll_arrows(
     frame: &mut Frame,
     inner: Rect,
@@ -225,39 +215,24 @@ fn render_footer(frame: &mut Frame, app: &mut App, area: Rect) {
             Span::styled(" ✓ Claude finished", Style::new().fg(Color::Green).bold()),
             key_hints(),
         ]),
-        ClaudeStatus::Unknown => Line::from(vec![
-            Span::styled(" hjkl", Style::new().fg(Color::Cyan)),
-            Span::styled("/arrows ", Style::new().dim()),
-            Span::styled("Space", Style::new().fg(Color::Cyan)),
-            Span::styled(" reveal  ", Style::new().dim()),
-            Span::styled("f", Style::new().fg(Color::Cyan)),
-            Span::styled(" flag  ", Style::new().dim()),
-            Span::styled("r", Style::new().fg(Color::Cyan)),
-            Span::styled(" restart  ", Style::new().dim()),
-            Span::styled("q", Style::new().fg(Color::Cyan)),
-            Span::styled(" quit", Style::new().dim()),
-        ]),
+        ClaudeStatus::Unknown => key_hints_line(),
     };
     frame.render_widget(Paragraph::new(line), area);
 }
 
-// ─── Cell rendering ───────────────────────────────────────────────────────────
+// ─── Cell rendering ──────────────────────────────────────────────────────────
 
 fn cell_span(view: CellView, is_cursor: bool) -> Span<'static> {
     match view {
         CellView::Hidden => {
             if is_cursor {
-                // Solid yellow block — unmistakable cursor on unrevealed tile
                 Span::styled("██", Style::new().fg(CURSOR_BG).bg(CURSOR_BG))
             } else {
-                // Light raised tile — clearly distinct from revealed (dark) cells
                 Span::styled("▒▒", Style::new().fg(HIDDEN_FG).bg(HIDDEN_BG))
             }
         }
 
         CellView::Flag => {
-            // Flag character on saturated red — Color::Red is ANSI muted red,
-            // Rgb gives the vivid red that actually reads as "flag"
             let bg = if is_cursor {
                 CURSOR_BG
             } else {
@@ -266,13 +241,9 @@ fn cell_span(view: CellView, is_cursor: bool) -> Span<'static> {
             Span::styled("⚑ ", Style::new().fg(Color::White).bg(bg).bold())
         }
 
-        CellView::Mine => {
-            // Exploded mine
-            Span::styled("* ", Style::new().fg(Color::White).bg(Color::Red).bold())
-        }
+        CellView::Mine => Span::styled("* ", Style::new().fg(Color::White).bg(Color::Red).bold()),
 
         CellView::Number(0) => {
-            // Revealed empty — dark "pressed in" look, clearly different from hidden tiles
             let bg = if is_cursor { CURSOR_BG } else { REVEALED_BG };
             let fg = if is_cursor {
                 CURSOR_FG
@@ -310,7 +281,7 @@ fn number_color(n: u8) -> Color {
 // ─── Border config ────────────────────────────────────────────────────────────
 
 fn border_config(app: &App) -> (Style, BorderType, String) {
-    let diff = format!(" {} ", format!("{:?}", app.difficulty).to_lowercase());
+    let diff = format!(" {} ", app.difficulty.label());
     match &app.claude_state.status {
         ClaudeStatus::Working => (Style::new().fg(Color::Blue), BorderType::Rounded, diff),
         ClaudeStatus::PermissionNeeded => {
@@ -344,24 +315,41 @@ fn border_config(app: &App) -> (Style, BorderType, String) {
 
 fn key_hints() -> Span<'static> {
     Span::styled(
-        "  hjkl move  Space reveal  f flag  r restart  Tab leaderboard  q quit",
+        "  hjkl move  Space reveal  f flag  r restart  Tab scores  Esc menu  q quit",
         Style::new().dim(),
     )
+}
+
+fn key_hints_line() -> Line<'static> {
+    Line::from(vec![
+        Span::styled(" hjkl", Style::new().fg(Color::Cyan)),
+        Span::styled(" move  ", Style::new().dim()),
+        Span::styled("Space", Style::new().fg(Color::Cyan)),
+        Span::styled(" reveal  ", Style::new().dim()),
+        Span::styled("f", Style::new().fg(Color::Cyan)),
+        Span::styled(" flag  ", Style::new().dim()),
+        Span::styled("r", Style::new().fg(Color::Cyan)),
+        Span::styled(" restart  ", Style::new().dim()),
+        Span::styled("Tab", Style::new().fg(Color::Cyan)),
+        Span::styled(" scores  ", Style::new().dim()),
+        Span::styled("Esc", Style::new().fg(Color::Cyan)),
+        Span::styled(" menu  ", Style::new().dim()),
+        Span::styled("q", Style::new().fg(Color::Cyan)),
+        Span::styled(" quit", Style::new().dim()),
+    ])
 }
 
 fn render_leaderboard(frame: &mut Frame, app: &App) {
     let total_area = frame.area();
 
-    // Popup dimensions
-    let popup_width = 62u16.min(total_area.width);
-    let row_count = (app.leaderboard_cache.len() as u16).max(1); // at least 1 for "no records"
-    let popup_height = (row_count + 5).min(total_area.height); // header + border + padding
+    let popup_width = 66u16.min(total_area.width);
+    let row_count = (app.leaderboard_cache.len() as u16).max(1);
+    let popup_height = (row_count + 5).min(total_area.height);
 
     let x = total_area.left() + total_area.width.saturating_sub(popup_width) / 2;
     let y = total_area.top() + total_area.height.saturating_sub(popup_height) / 2;
     let popup_area = Rect::new(x, y, popup_width, popup_height);
 
-    // Clear background
     frame.render_widget(Clear, popup_area);
 
     let block = Block::default()
@@ -379,11 +367,10 @@ fn render_leaderboard(frame: &mut Frame, app: &App) {
         return;
     }
 
-    // Header row
     let header = Line::from(Span::styled(
         format!(
-            "{:<8} {:>7}  {:>5}  {:<3}  {}",
-            "DIFF", "SCORE", "TIME", "WIN", "DATE"
+            "{:<12} {:>7}  {:>5}  {:<3}  {}",
+            "GAME/DIFF", "SCORE", "TIME", "WIN", "DATE"
         ),
         Style::new().fg(Color::Yellow).bold(),
     ));
@@ -415,9 +402,10 @@ fn render_leaderboard(frame: &mut Frame, app: &App) {
         } else {
             &r.timestamp
         };
+        let label = format!("{}/{}", r.game, r.difficulty);
         let row_text = format!(
-            "{:<8} {:>7}  {:>5}  {:<3}  {}",
-            r.difficulty, r.score, time_str, won_str, date
+            "{:<12} {:>7}  {:>5}  {:<3}  {}",
+            label, r.score, time_str, won_str, date
         );
         let color = if i == 0 { Color::Green } else { Color::White };
         frame.render_widget(

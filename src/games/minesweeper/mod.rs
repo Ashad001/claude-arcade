@@ -4,9 +4,46 @@ pub mod render;
 
 use std::time::Instant;
 
-use crate::Difficulty;
 use crate::state::{ClaudeState, ClaudeStatus};
 use board::{Board, GameState};
+
+// ─── Difficulty ───────────────────────────────────────────────────────────────
+
+#[derive(Debug, Clone, clap::ValueEnum)]
+pub enum Difficulty {
+    Easy,
+    Medium,
+    Hard,
+}
+
+impl Difficulty {
+    /// Returns (width, height, mines)
+    pub fn board_params(&self) -> (usize, usize, usize) {
+        match self {
+            Difficulty::Easy => (9, 9, 10),
+            Difficulty::Medium => (16, 16, 40),
+            Difficulty::Hard => (30, 16, 99),
+        }
+    }
+
+    pub fn score_multiplier(&self) -> u32 {
+        match self {
+            Difficulty::Easy => 1,
+            Difficulty::Medium => 2,
+            Difficulty::Hard => 4,
+        }
+    }
+
+    pub fn label(&self) -> &'static str {
+        match self {
+            Difficulty::Easy => "easy",
+            Difficulty::Medium => "medium",
+            Difficulty::Hard => "hard",
+        }
+    }
+}
+
+// ─── App ─────────────────────────────────────────────────────────────────────
 
 pub struct App {
     pub board: Board,
@@ -17,21 +54,20 @@ pub struct App {
     pub difficulty: Difficulty,
     pub claude_state: ClaudeState,
     pub should_quit: bool,
+    pub back_to_menu: bool,
     pub permission_alerted: bool,
     pub done_since: Option<Instant>,
     pub flash_on: bool,
     flash_tick: u8,
 
-    // Timer tracking
-    pub timer_start: Option<Instant>, // set on first actual reveal
-    paused_at: Option<Instant>,       // Some while PermissionNeeded is active
-    paused_secs: u64,                 // accumulated pause time
-    pub elapsed_secs: u64,            // frozen final value when game ends
+    pub timer_start: Option<Instant>,
+    paused_at: Option<Instant>,
+    paused_secs: u64,
+    pub elapsed_secs: u64,
 
-    // Leaderboard overlay
     pub show_leaderboard: bool,
     pub leaderboard_cache: Vec<crate::stats::GameRecord>,
-    pub record_saved: bool, // guard: save only once per game
+    pub record_saved: bool,
 }
 
 impl App {
@@ -45,6 +81,7 @@ impl App {
             difficulty,
             claude_state: ClaudeState::default(),
             should_quit: false,
+            back_to_menu: false,
             permission_alerted: false,
             done_since: None,
             flash_on: true,
@@ -63,8 +100,10 @@ impl App {
 
     pub fn handle_action(&mut self, action: input::Action) {
         if self.claude_state.status == ClaudeStatus::PermissionNeeded {
-            if action == input::Action::Quit {
-                self.should_quit = true;
+            match action {
+                input::Action::Quit => self.should_quit = true,
+                input::Action::BackToMenu => self.back_to_menu = true,
+                _ => {}
             }
             return;
         }
@@ -79,7 +118,6 @@ impl App {
             input::Action::Reveal => {
                 let newly_revealed = self.board.reveal(self.cursor.0, self.cursor.1);
                 if newly_revealed > 0 {
-                    // Start timer on the first successful reveal
                     if self.timer_start.is_none() {
                         self.timer_start = Some(Instant::now());
                     }
@@ -96,18 +134,15 @@ impl App {
                     self.leaderboard_cache = crate::stats::leaderboard_top(10);
                 }
             }
+            input::Action::BackToMenu => self.back_to_menu = true,
             input::Action::Quit => self.should_quit = true,
         }
     }
 
-    /// Called by the renderer with how many cells are visible.
-    /// Uses edge-only (lazy) scrolling: the viewport only moves when the cursor
-    /// actually exits the visible area. This ensures every keypress moves the
-    /// cursor by exactly 1 visual cell — no phantom "skip" frames.
+    /// Called by the renderer to keep cursor in the visible viewport.
     pub fn scroll_to_cursor(&mut self, visible_cols: usize, visible_rows: usize) {
         let (cx, cy) = self.cursor;
 
-        // Horizontal — only scroll if board is wider than the pane
         if self.board.width <= visible_cols {
             self.viewport.0 = 0;
         } else {
@@ -120,7 +155,6 @@ impl App {
             *vx = (*vx).min(self.board.width.saturating_sub(visible_cols));
         }
 
-        // Vertical — only scroll if board is taller than the pane
         if self.board.height <= visible_rows {
             self.viewport.1 = 0;
         } else {
@@ -140,17 +174,14 @@ impl App {
 
         if prev_status != ClaudeStatus::PermissionNeeded
             && self.claude_state.status == ClaudeStatus::PermissionNeeded
+            && self.timer_start.is_some()
         {
-            // Transitioning INTO PermissionNeeded — start pausing
-            if self.timer_start.is_some() {
-                self.paused_at = Some(Instant::now());
-            }
+            self.paused_at = Some(Instant::now());
         }
 
         if prev_status == ClaudeStatus::PermissionNeeded
             && self.claude_state.status != ClaudeStatus::PermissionNeeded
         {
-            // Transitioning OUT of PermissionNeeded — accumulate pause duration
             if let Some(pa) = self.paused_at.take() {
                 self.paused_secs += pa.elapsed().as_secs();
             }
@@ -181,11 +212,12 @@ impl App {
             self.done_since = None;
         }
 
-        if self.board.state == GameState::Won && self.claude_state.status == ClaudeStatus::Working {
+        if self.board.state == GameState::Won
+            && self.claude_state.status == ClaudeStatus::Working
+        {
             self.score += self.board.flag_bonus() * self.difficulty.score_multiplier();
         }
 
-        // Save record once when the game ends
         if self.board.state != GameState::Playing
             && !self.record_saved
             && self.timer_start.is_some()
@@ -193,7 +225,8 @@ impl App {
             self.elapsed_secs = self.current_elapsed_secs(now);
             let (_, _, mine_count) = self.difficulty.board_params();
             let record = crate::stats::GameRecord {
-                difficulty: format!("{:?}", self.difficulty).to_lowercase(),
+                game: "minesweeper".into(),
+                difficulty: self.difficulty.label().into(),
                 score: self.score,
                 time_secs: self.elapsed_secs,
                 won: self.board.state == GameState::Won,
@@ -210,9 +243,6 @@ impl App {
         }
     }
 
-    /// Elapsed game time in seconds, accounting for pauses.
-    /// Returns 0 if the timer has not started.
-    /// Returns the frozen value if the game is over.
     fn current_elapsed_secs(&self, now: Instant) -> u64 {
         let Some(start) = self.timer_start else {
             return 0;
@@ -241,7 +271,6 @@ impl App {
         self.score = 0;
         self.permission_alerted = false;
 
-        // Reset timer
         self.timer_start = None;
         self.paused_at = None;
         self.paused_secs = 0;

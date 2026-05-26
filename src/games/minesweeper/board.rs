@@ -63,7 +63,6 @@ impl Board {
             return 0;
         }
 
-        // First reveal: place mines avoiding (x, y)
         if !self.mines_placed {
             self.place_mines(x, y);
             self.mines_placed = true;
@@ -111,7 +110,6 @@ impl Board {
         correct * 50
     }
 
-    /// Cell display info for rendering.
     pub fn cell_view(&self, x: usize, y: usize) -> CellView {
         let cell = &self.cells[y][x];
         if cell.is_revealed {
@@ -131,14 +129,11 @@ impl Board {
         self.mine_count as i32 - self.flagged_count as i32
     }
 
-    // -- Private helpers --
-
     fn place_mines(&mut self, safe_x: usize, safe_y: usize) {
         let total = self.width * self.height;
         let mut candidates: Vec<usize> = (0..total)
             .filter(|&i| {
                 let (cx, cy) = (i % self.width, i / self.width);
-                // Exclude safe cell and its neighbours
                 let dx = (cx as i32 - safe_x as i32).abs();
                 let dy = (cy as i32 - safe_y as i32).abs();
                 dx > 1 || dy > 1
@@ -187,7 +182,6 @@ impl Board {
             self.revealed_count += 1;
             count += 1;
 
-            // Expand if zero
             if self.cells[cy][cx].adjacent_mines == 0 {
                 for neighbour in self.neighbours(cx, cy) {
                     stack.push(neighbour);
@@ -201,7 +195,6 @@ impl Board {
         let safe_cells = self.width * self.height - self.mine_count;
         if self.revealed_count >= safe_cells {
             self.state = GameState::Won;
-            // Auto-flag remaining mines
             for y in 0..self.height {
                 for x in 0..self.width {
                     if self.cells[y][x].is_mine && !self.cells[y][x].is_flagged {
@@ -273,7 +266,6 @@ mod tests {
         for _ in 0..50 {
             let mut board = Board::new(9, 9, 10);
             board.reveal(4, 4);
-            // After first reveal, (4,4) must be revealed and not a mine
             assert_ne!(board.cell_view(4, 4), CellView::Mine);
             assert_ne!(board.cell_view(4, 4), CellView::Hidden);
         }
@@ -308,22 +300,16 @@ mod tests {
 
     #[test]
     fn win_condition_all_safe_cells_revealed() {
-        // Use a 3x3 board with 1 mine — manually place the mine and reveal others
         let mut board = Board::new(3, 3, 1);
-        // Force mine placement by doing first reveal at (0,0)
-        // We do multiple reveals to cover all safe cells
-        // This is probabilistic but with 1 mine in 9 cells, (0,0) is almost always safe
         board.reveal(0, 0);
         if board.state == GameState::Lost {
-            return; // rare case, skip
+            return;
         }
-        // Reveal all non-mine, non-flagged cells
         for y in 0..3 {
             for x in 0..3 {
                 board.reveal(x, y);
             }
         }
-        // Should be Won or Lost (win if no mine hit)
         assert!(
             board.state == GameState::Won || board.state == GameState::Lost,
             "state should be terminal"
