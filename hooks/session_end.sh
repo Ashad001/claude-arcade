@@ -1,19 +1,25 @@
 #!/bin/sh
 # Hook: SessionEnd
 # Writes done state and kills the claude-arcade tmux pane.
-# Must always exit 0.
-set -eu
+# Always exits 0 — never blocks Claude Code.
 
-STATE_DIR="$HOME/.claude-arcade"
-STATE_FILE="$STATE_DIR/state.json"
+trap 'exit 0' EXIT INT TERM
 
-mkdir -p "$STATE_DIR"
+STATE_DIR="${HOME}/.claude-arcade"
+STATE_FILE="${STATE_DIR}/state.json"
+
+mkdir -p "$STATE_DIR" 2>/dev/null || true
 
 UPDATED_AT=$(date -u +"%Y-%m-%dT%H:%M:%SZ" 2>/dev/null || echo "")
-printf '{"status":"done","updated_at":"%s"}\n' "$UPDATED_AT" > "$STATE_FILE"
+printf '{"status":"done","updated_at":"%s"}\n' "$UPDATED_AT" > "$STATE_FILE" 2>/dev/null || true
+
+# Skip tmux teardown on WSL — same cross-environment reliability concern as SessionStart
+if [ -f /proc/version ] && grep -qi 'microsoft\|wsl' /proc/version 2>/dev/null; then
+    exit 0
+fi
 
 # Give the game a moment to render the done banner before killing the pane
-sleep 3
+sleep 3 2>/dev/null || true
 
 # Kill panes running claude-arcade (best-effort, tmux may not be available)
 if [ -n "${TMUX:-}" ] && command -v tmux >/dev/null 2>&1; then

@@ -1,15 +1,16 @@
 #!/bin/sh
 # Hook: Notification
 # Routes to permission_needed or idle based on message content.
-# Must always exit 0.
-set -eu
+# Always exits 0 — never blocks Claude Code.
 
-STATE_DIR="$HOME/.claude-arcade"
-STATE_FILE="$STATE_DIR/state.json"
+trap 'exit 0' EXIT INT TERM
 
-mkdir -p "$STATE_DIR"
+STATE_DIR="${HOME}/.claude-arcade"
+STATE_FILE="${STATE_DIR}/state.json"
 
-INPUT=$(cat)
+mkdir -p "$STATE_DIR" 2>/dev/null || true
+
+INPUT=$(cat 2>/dev/null || true)
 MESSAGE=$(printf '%s' "$INPUT" | jq -r '.message // ""' 2>/dev/null || echo "")
 UPDATED_AT=$(date -u +"%Y-%m-%dT%H:%M:%SZ" 2>/dev/null || echo "")
 
@@ -21,9 +22,9 @@ else
 fi
 
 # Escape message for JSON (strip quotes/backslashes to keep it safe)
-SAFE_MSG=$(printf '%s' "$MESSAGE" | tr -d '"\\')
+SAFE_MSG=$(printf '%s' "$MESSAGE" | tr -d '"\\' 2>/dev/null || echo "")
 
 printf '{"status":"%s","message":"%s","updated_at":"%s"}\n' \
-    "$STATUS" "$SAFE_MSG" "$UPDATED_AT" > "$STATE_FILE"
+    "$STATUS" "$SAFE_MSG" "$UPDATED_AT" > "$STATE_FILE" 2>/dev/null || true
 
 exit 0

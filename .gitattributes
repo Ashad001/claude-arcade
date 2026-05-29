@@ -1,0 +1,9 @@
+# Force LF line endings for shell scripts on all platforms.
+# Windows contributors: git will convert CRLF→LF on commit for these files.
+*.sh text eol=lf
+
+# Rust source stays with native line endings
+*.rs text=auto
+*.toml text=auto
+*.json text=auto
+*.md text=auto
